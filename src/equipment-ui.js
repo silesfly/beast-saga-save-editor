@@ -4,21 +4,23 @@ let listStates=InventoryList.defaults(),listResult=null;
 let pointValues=null,pointDraft=null;
 let statValues=null,statDraft=null,statsReady=false;
 let friendPending=new Map(),friendDrafts=new Map(),friendSelected=null,countDrafts=new Map(),optionDrafts=new Map(),invalidDrafts=new Map();
+const newAdds=new Map();let catalogVerified=false;
 const hasEdits=()=>pendingSize()>0||invalidDrafts.size>0;
-function resetDrafts(){pointValues=null;pointDraft=null;statDraft=null;friendPending.clear();friendDrafts.clear();countDrafts.clear();optionDrafts.clear();invalidDrafts.clear();}
+function resetDrafts(){newAdds.clear();pointValues=null;pointDraft=null;statDraft=null;friendPending.clear();friendDrafts.clear();countDrafts.clear();optionDrafts.clear();invalidDrafts.clear();}
 
-const pendingSize=()=>counts.size+options.size+(statValues?1:0)+friendPending.size+(pointValues?1:0);
+const pendingSize=()=>newAdds.size+counts.size+options.size+(statValues?1:0)+friendPending.size+(pointValues?1:0);
 let optionScope='affixes',nativeSession=null;
 let doc=null,model=null,file=null,counts=new Map(),options=new Map(),selected=null,tab='stats',generation=0,revision=0,busy=false;
 function msg(text,error=false){$('status').textContent=text;$('status').className=error?'status error':'status';}
 function dl(data,name,type='application/octet-stream'){const u=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),10000);}
 function filename(){return file.name.replace(/\.es3$/i,'').replace(/[^\p{L}\p{N}_. -]/gu,'_').slice(0,100);}
 function sync(){
+ for(const id of ['addTrial','addQuantity','catalogSearch','catalogState','verifyCatalog'])$(id).disabled=busy;
  const cash=Equipment.money(model);$('moneyButton').disabled=!cash||busy;
  $('moneyButton').textContent=cash?'돈 · 동전 수정 ('+Number(counts.get(cash.path)??cash.count).toLocaleString()+')':'돈 · 동전 수정';
  $('backup').disabled=!doc||busy; $('file').disabled=busy; if($('nativeOpen'))$('nativeOpen').disabled=busy; $('export').disabled=!doc||busy||pendingSize()===0||invalidDrafts.size>0;
- $('clear').disabled=busy||!hasEdits();$('stage').disabled=!selected||busy||tab==='gears'&&selected.effects.length===0;
- for(const el of document.querySelectorAll('#fields input,#fields select,#statsFields input,#friendFields input,#friendPicker,#pointsFields input'))el.disabled=busy;
+ $('clear').disabled=busy||!hasEdits();$('stage').disabled=!selected||busy||tab==='gears'&&!!Equipment.editable(selected);
+ for(const el of document.querySelectorAll('#fields input,#fields select,#statsFields input,#friendFields input,#friendPicker,#pointsFields input'))el.disabled=busy||el.dataset.locked==='true';
  $('stageStats').disabled=!doc||busy||!statsReady;
  syncListControls();
  $('pendingCount').textContent=(pendingSize())+'개 대상 변경 대기';
@@ -39,10 +41,11 @@ async function loadFile(f){
  }catch(e){if(gen!==generation)return;$('totals').textContent='열기 실패';msg(e.message,true);sync();}
 }
 function render(){
+ $('addPanel').hidden=tab!=='add';$('addTab').classList.toggle('active',tab==='add');
  $('pointsPanel').hidden=tab!=='points';$('pointsTab').classList.toggle('active',tab==='points');
  $('itemsTab').classList.toggle('active',tab==='items');$('gearsTab').classList.toggle('active',tab==='gears');
- $('statsTab').classList.toggle('active',tab==='stats');$('statsPanel').hidden=tab!=='stats';$('friendsPanel').hidden=tab!=='friends';$('friendsTab').classList.toggle('active',tab==='friends');$('inventoryGrid').hidden=tab==='stats'||tab==='friends'||tab==='points';
- if(tab==='points'){renderPoints();return;}if(tab==='stats'){renderStats();return;}if(tab==='friends'){renderFriends();return;}
+ $('statsTab').classList.toggle('active',tab==='stats');$('statsPanel').hidden=tab!=='stats';$('friendsPanel').hidden=tab!=='friends';$('friendsTab').classList.toggle('active',tab==='friends');$('inventoryGrid').hidden=tab==='stats'||tab==='friends'||tab==='points'||tab==='add';
+ if(tab==='add'){renderAdd();return;}if(tab==='points'){renderPoints();return;}if(tab==='stats'){renderStats();return;}if(tab==='friends'){renderFriends();return;}
  $('scope').hidden=tab!=='gears';$('list').replaceChildren();
  const state=listStates[tab];renderCategoryFilters(state);$('search').value=state.query;$('scope').value=state.scope;$('pageSize').value=String(state.size);
  $('listSort').replaceChildren();for(const [value,label] of InventoryList.sorts(tab))$('listSort').append(option(value,label));$('listSort').value=state.sort;
@@ -75,40 +78,28 @@ function choose(x){
   const note=document.createElement('p');note.className='muted';note.textContent=currency?'주인공이 보유한 동전(铜钱)만 수정합니다. 입력 범위 0~1,000,000은 편집기 제한입니다. 게임 내 상한·불러오기는 미검증입니다. 상점 잔액은 바꾸지 않습니다.':'입력 범위 1~1,000,000개는 편집기 제한입니다. 게임의 수량 상한은 미검증입니다. 0개 삭제와 새 아이템 추가는 지원하지 않습니다.';
   $('fields').append(p,label,select,input,note);
  }else{
-  const p=document.createElement('p');p.textContent='게임 소스에서 추출한 옵션입니다. 기존 '+x.effects.length+'개 슬롯을 유지합니다.';$('fields').append(p);
-  const scopeLabel=document.createElement('label');scopeLabel.textContent='옵션 목록 범위';
-  const scope=document.createElement('select');scope.id='optionScope';
-  scope.append(option('recommended','이 장비 기본 옵션 ('+x.recommended.length+'종)'),option('affixes','모든 장비 옵션 (49종)'),option('all','전체 기술 정의 (370종 · 실험적)'));
-  scope.value=optionScope;scope.onchange=()=>{optionScope=scope.value;buildEffects();};$('fields').append(scopeLabel,scope);
-  const search=document.createElement('input');search.type='search';search.placeholder='옵션 이름 검색';search.id='optionSearch';$('fields').append(search);
+  const reason=Equipment.editable(x)||(!catalogVerified?'분류별 아이템 추가 화면에서 설치 데이터를 먼저 확인하세요.':''),p=document.createElement('p');
+  p.textContent=reason||'장비별 후보만 선택합니다. 등급 '+x.level+'은 현재 장비 생성 등급입니다. 새 중첩은 복사본 시험이며 게임 효과는 미검증입니다.';
+  $('fields').append(p);
+  const stored=optionDrafts.get(x.path)||options.get(x.path)||x.effects.map(e=>e.id);
+  let rows=stored.flatMap(id=>{const [key,levels]=JSON.parse(id);return levels.map(lv=>({key,lv}));});
   const box=document.createElement('div');box.id='effectFields';$('fields').append(box);
-  let selectedIds=[...(optionDrafts.get(x.path)||options.get(x.path)||x.effects.map(e=>e.id))];
-  function buildEffects(){
-   box.replaceChildren();
-   const allowed=optionScope==='recommended'?x.recommended:optionScope==='affixes'?GameCatalog.affixes:Object.keys(GameCatalog.skills);
-   const query=search.value.trim().toLowerCase();
-   x.effects.forEach((fx,i)=>{
-    const current=x.choices.find(c=>c.id===selectedIds[i])||fx;
-    const label=document.createElement('label');label.textContent='옵션 '+(i+1)+' · 원래 '+Equipment.effectLabel(fx);
-    const kind=document.createElement('select');kind.id='effect'+i;kind.className='effectKind';
-    const candidates=[...new Set([current.key,...allowed.filter(k=>(k+' '+GameCatalog.skills[k]?.label).toLowerCase().includes(query))])];
-    for(const key of candidates)kind.append(option(key,(x.recommended.includes(key)?'★ ':'')+(GameCatalog.skills[key]?.label||key)+' ['+key+']'));
-    kind.value=current.key;
-    const level=document.createElement('select');level.className='effect';level.id='effectLevel'+i;
-    const description=document.createElement('p');description.className='muted';
-    function levels(){
-     level.replaceChildren();const choices=x.choices.filter(c=>c.key===kind.value);
-     for(const c of choices)level.append(option(c.id,'등급 '+c.levels.join('/')+(c.levels.join('/')===x.level?' · 장비 등급':'')));
-     const prior=x.choices.find(c=>c.id===selectedIds[i]);
-     level.value=choices.find(c=>c.levels.join('/')===prior?.levels.join('/'))?.id||choices.find(c=>c.levels.join('/')===x.level)?.id||choices[0].id;
-     selectedIds[i]=level.value;
-     const s=GameCatalog.skills[kind.value];description.textContent=(s?.description||s?.functionDescription||'게임 설명 없음').replace(/\[\/?color[^\]]*\]/g,'')+' · N/K는 게임 계산값입니다.';
-    }
-    kind.onchange=levels;level.onchange=()=>{selectedIds[i]=level.value;};levels();box.append(label,kind,level,description);
-   });
-  }
-  search.oninput=buildEffects;buildEffects();
-  const note=document.createElement('p');note.className='muted';note.textContent='★는 이 장비의 기본 옵션입니다. 다른 장비 옵션·전체 기술은 자연 생성 범위 밖이며, 효과가 없거나 조합에 따라 다를 수 있습니다. 등급 0~7은 설치 게임의 장비 등급 범위입니다.';$('fields').append(note);
+  function buildEffects(){box.replaceChildren();rows.forEach((row,i)=>{
+   const label=document.createElement('label');label.textContent='중첩 '+(i+1)+' · 등급 '+row.lv;
+   const kind=document.createElement('select');kind.id='effect'+i;kind.className='effectKind';kind.dataset.locked=String(!!reason);
+   for(const key of [...new Set([row.key,...x.recommended])])kind.append(option(key,(GameCatalog.skills[key]?.label||key)+' ['+key+']'));
+   kind.value=row.key;kind.disabled=!!reason;
+   const value=document.createElement('input');value.type='hidden';value.className='effect';value.value=JSON.stringify([row.key,[row.lv]]);
+   kind.onchange=()=>{row.key=kind.value;value.value=JSON.stringify([row.key,[row.lv]]);};
+   box.append(label,kind,value);
+  });}
+  buildEffects();
+  const add=document.createElement('button');add.type='button';add.textContent='새 옵션 중첩 추가 · 복사본 시험';add.id='appendEffect';
+  add.disabled=!!reason||rows.length>=x.slotLimit;
+  add.onclick=()=>{if(busy||reason||rows.length>=x.slotLimit)return;rows.push({key:x.recommended[0],lv:x.level});buildEffects();add.disabled=rows.length>=x.slotLimit;$('stage').onclick();};
+  $('fields').append(add);
+  const note=document.createElement('p');note.className='muted';note.textContent='같은 옵션의 반복은 한 키의 레벨 배열로 저장합니다. 기존 중첩 삭제는 차단합니다. 정의 슬롯 '+x.slotLimit+'개, 현재 중첩 '+x.effects.reduce((n,f)=>n+f.levels.length,0)+'개. 영화 부착은 별도 기능으로 미지원입니다.';$('fields').append(note);
+
  }
  const details=document.createElement('details'),summary=document.createElement('summary'),path=document.createElement('code');summary.textContent='저장 위치 확인';path.textContent=x.path;details.append(summary,path);$('fields').append(details);sync();
 }
@@ -130,7 +121,7 @@ $('moneyButton').onclick=()=>{
  tab='items';clearDetail();listStates.items={...InventoryList.defaults().items,query:'铜钱'};render();choose(cash);
  msg('주인공 보유 동전입니다. 금액 입력 후 세이브 저장을 누르세요.');
 };
-for(const [id,value] of [['pointsTab','points'],['statsTab','stats'],['friendsTab','friends'],['itemsTab','items'],['gearsTab','gears']])$(id).onclick=()=>{if(busy)return;tab=value;clearDetail();render();};
+for(const [id,value] of [['addTab','add'],['pointsTab','points'],['statsTab','stats'],['friendsTab','friends'],['itemsTab','items'],['gearsTab','gears']])$(id).onclick=()=>{if(busy)return;tab=value;clearDetail();render();};
 $('categoryFilter').onchange=()=>changeList('category',$('categoryFilter').value);
 $('subcategoryFilter').onchange=()=>changeList('subcategory',$('subcategoryFilter').value);
 $('search').oninput=()=>changeList('query',$('search').value);
@@ -154,7 +145,7 @@ $('stage').onclick=()=>{
   if(tab==='items'){
    countDrafts.set(selected.path,$('quantity').value);const v=Equipment.number(selected,$('quantity').value);if(v===selected.count)counts.delete(selected.path);else counts.set(selected.path,v);
   }else{
-   const ids=[...document.querySelectorAll('.effect')].map(s=>s.value);optionDrafts.set(selected.path,ids);Equipment.validateChoice(selected,ids);
+   const rawIds=[...document.querySelectorAll('.effect')].map(s=>s.value);optionDrafts.set(selected.path,rawIds);const ids=Equipment.validateChoice(selected,rawIds).map(f=>f.id);
    if(JSON.stringify(ids)===JSON.stringify(selected.effects.map(x=>x.id)))options.delete(selected.path);else options.set(selected.path,ids);
   }
   invalidDrafts.delete('entry:'+selected.path);revision++;pending();render();msg(window.nativeRequest?'변경이 자동 반영됐습니다. 세이브 저장을 누르면 자동 백업 후 적용합니다.':'변경 목록에 추가했습니다. 다운로드 전까지 파일은 변경되지 않습니다.');
@@ -164,12 +155,16 @@ $('clear').onclick=()=>{if(!busy&&confirm('대기 변경을 모두 취소할까�
 $('backup').onclick=()=>{if(doc&&!busy)dl(doc.bytes,filename()+'.ORIGINAL-BACKUP.es3');};
 $('export').onclick=async()=>{
  if(!doc||busy||pendingSize()===0||invalidDrafts.size)return;
- busy=true;sync();const gen=generation,rev=revision,source=doc,f=file,oldCounts=new Map(counts),oldOptions=new Map([...options].map(([k,v])=>[k,[...v]])),name=filename();
+ busy=true;sync();const gen=generation,rev=revision,source=doc,f=file,oldCounts=new Map(counts),oldOptions=new Map([...options].map(([k,v])=>[k,[...v]])),oldAdds=new Map(newAdds),oldTrial=$('addTrial').checked,name=filename();
  try{
   const current=new Uint8Array(await f.arrayBuffer());
   if(gen!==generation||rev!==revision)throw Error('파일 또는 변경 목록이 바뀌어 내보내기를 취소했습니다.');
   if(current.length!==source.bytes.length||current.some((b,i)=>b!==source.bytes[i]))throw Error('원본 파일이 외부에서 변경되었습니다. 다시 여세요.');
+  for(const id of oldAdds.keys())if([...oldCounts.keys()].some(p=>p===Additions.plan(source,new Map([[id,oldAdds.get(id)]]),oldTrial).bag.ptr+'/'+id))throw Error('같은 항목의 수량 설정과 추가를 동시에 저장할 수 없습니다. 하나를 취소하세요.');
   let out=Equipment.apply(source,oldCounts,oldOptions);
+  const copyOnly=oldAdds.size>0||oldOptions.size>0;
+  if(copyOnly&&!catalogVerified)throw Error('검증한 설치 데이터가 필요합니다.');
+  if(oldAdds.size)out=Additions.apply(SaveCore.parse(out),oldAdds,oldTrial);
   if(statValues||[...oldOptions.keys()].some(p=>p.startsWith(PlayerStats.root+'/PlayerDressEquip/'))){const staged=SaveCore.parse(out);out=PlayerStats.apply(staged,statValues||PlayerStats.fields(staged));}
   out=FriendStats.apply(SaveCore.parse(out),friendPending,friendGearPaths(oldOptions));
   if(pointValues)out=PlayerPoints.apply(SaveCore.parse(out),pointValues);
@@ -177,11 +172,12 @@ $('export').onclick=async()=>{
   if(window.nativeRequest){
    if(!nativeSession)throw Error('위쪽 세이브 열기 버튼으로 실제 파일을 다시 여세요.');
    msg('원본 자동 백업 및 세이브 저장 중…');
-   const result=await window.nativeRequest({kind:'save',session:nativeSession,data:toBase64(out)});
+   const result=await window.nativeRequest({kind:copyOnly?'save-copy':'save',session:nativeSession,data:toBase64(out)});
+   if(result.cancelled){msg('복사본 저장을 취소했습니다. 변경 계획은 유지됩니다.');return;}
    doc=SaveCore.parse(out);model=Equipment.inspect(doc);file=new File([out],f.name);file.nativeSession=result.session;nativeSession=result.session;
    counts.clear();options.clear();statValues=null;resetDrafts();statDraft=null;invalidDrafts.delete('stats');revision++;pending();render();clearDetail();
    $('totals').textContent=result.path+' · 저장 완료';
-   msg('세이브 저장 완료. 게임에서 이 슬롯을 불러오세요. 자동 백업: '+result.backup);
+   msg(copyOnly?'복사본 저장 완료 · 게임 검증 전 시험본: '+result.path:'세이브 저장 완료. 게임에서 이 슬롯을 불러오세요. 자동 백업: '+result.backup);
   }else{
    if(!confirm('별도 수정본을 다운로드합니다. 게임에 바로 적용하려면 EXE를 사용하세요.\n\n'+preview.slice(0,6000)))return;
    dl(out,name+'.ITEMS-EDITED.es3');msg('수정본 다운로드를 요청했습니다. 브라우저 버전은 원본을 교체하지 않습니다.');
@@ -207,7 +203,7 @@ function installNative(){
   }catch(e){msg(e.message,true);}finally{busy=false;sync();}
  };
  $('export').textContent='세이브 저장 · 자동 백업';
- $('saveHelp').textContent='열었던 세이브를 자동 백업한 뒤 같은 슬롯 파일에 저장합니다. 게임을 종료한 상태에서 편집하세요.';
+ $('saveHelp').textContent='기존 값만 편집하면 자동 백업 후 같은 파일에 저장합니다. 아이템 추가·옵션 변경이 있으면 새 복사본으로 저장합니다. 게임을 종료하고 시험용 복사본을 여세요.';
  msg('게임을 종료하고 실제 세이브 파일을 여세요. 저장하면 자동 백업 후 원래 파일에 적용합니다.');
 }
 if(window.chrome?.webview)installNative();

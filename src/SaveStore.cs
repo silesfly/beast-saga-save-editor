@@ -30,6 +30,15 @@ internal static class SaveStore {
             using(var sha=SHA256.Create()) using(var expected=SHA256.Create()) if(!sha.ComputeHash(stream).SequenceEqual(expected.ComputeHash(data))) throw new IOException("저장 검증 실패");
         }
     }
+    internal static string CopyWithBackup(string source,string destination,string expectedHash,byte[] data) {
+        source=Path.GetFullPath(source);destination=Path.GetFullPath(destination);
+        NoLinks(source);NoLinks(destination);
+        if(String.Equals(source,destination,StringComparison.OrdinalIgnoreCase)||File.Exists(destination))throw new IOException("새 복사본 경로를 선택하세요. 기존 파일은 덮어쓰지 않습니다.");
+        if(!destination.EndsWith(".es3",StringComparison.OrdinalIgnoreCase)||data.Length==0||data.Length>10485760)throw new IOException("복사본 형식·크기 오류");
+        byte[] original=Read(source);if(Hash(original)!=expectedHash)throw new IOException("원본이 변경되었습니다. 다시 열어 주세요.");
+        string backup=destination+".original-"+Guid.NewGuid().ToString("N")+".bak";
+        WriteNew(backup,original);WriteNew(destination,data);return backup;
+    }
     internal static string ReplaceWithBackup(string path, string expectedHash, byte[] data) {
         path=Path.GetFullPath(path);NoLinks(path);
         if(!path.EndsWith(".es3",StringComparison.OrdinalIgnoreCase)) throw new IOException(".es3 파일만 저장할 수 있습니다.");

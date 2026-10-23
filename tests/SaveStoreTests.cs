@@ -24,6 +24,13 @@ class SaveStoreTests {
   Reject(()=>SaveStore.WriteNew(backup,b),"Existing backup cannot be overwritten");
   using(var fail=new FaultStream(a,false)){Reject(()=>SaveStore.UpdateOrRestore(fail,a,b,"fixture.bak"),"Partial write failure reports failure");Assert(fail.ToArray().SequenceEqual(a),"Partial write failure restores exact original bytes");}
   using(var fail=new FaultStream(a,true)){try{SaveStore.UpdateOrRestore(fail,a,b,"fixture.bak");throw new Exception("Expected failure");}catch(IOException ex){Assert(ex.Message.Contains("fixture.bak")&&ex.Message.Contains("자동 원상복구에 실패"),"Persistent disk failure reports backup and failed rollback");}}
+  string copy=Path.Combine(root,"copy.es3");string copyBackup=SaveStore.CopyWithBackup(target,copy,SaveStore.Hash(c),b);
+  Assert(SaveStore.Read(target).SequenceEqual(c)&&SaveStore.Read(copy).SequenceEqual(b),"Copy save preserves source and writes separate destination");
+  Assert(SaveStore.Read(copyBackup).SequenceEqual(c),"Copy backup equals source");
+  Reject(()=>SaveStore.CopyWithBackup(target,target,SaveStore.Hash(c),b),"Copy save cannot select source");
+  Reject(()=>SaveStore.CopyWithBackup(target,copy,SaveStore.Hash(c),a),"Copy cannot overwrite existing destination");
+  string staleCopy=Path.Combine(root,"stale-copy.es3");Reject(()=>SaveStore.CopyWithBackup(target,staleCopy,SaveStore.Hash(a),b),"Stale source blocks copy");
+  Assert(!File.Exists(staleCopy),"Stale copy failure creates no target");
   Console.WriteLine("ALL PASS");return 0;
  }
  class FaultStream:MemoryStream {

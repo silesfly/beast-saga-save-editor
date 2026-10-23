@@ -2,11 +2,6 @@
 const Equipment = (()=>{
  const base='/savePlayerData/value';
  const enc=new TextEncoder();
- const catalogChoices=[];
- for(const key of Object.keys(GameCatalog.skills))for(let level=0;level<=7;level++){
-  const levels=[String(level)],id=JSON.stringify([key,levels]);catalogChoices.push({id,key,levels,arrayRaw:levels[0]});
- }
- const catalogIds=new Set(catalogChoices.map(c=>c.id));
  const aliases=new Map([['3妆花缎','장화단'],['5法文戒指','룬 반지']]);
  const labels=new Map([['五行增强-木','목행 무공 피해 증가'],['五行增强-金','금행 무공 피해 증가'],['五行增强-水','수행 무공 피해 증가'],['五行增强-火','화행 무공 피해 증가'],['五行增强-土','토행 무공 피해 증가'],['属性增加-速度','속도 능력치 증가'],['抗点穴增加','점혈 저항 증가'],['抗着火增加','화상 저항 증가'],['抗流血增加','출혈 저항 증가'],['闪避','회피']]);
  const field=(n,key)=>n?.children.find(x=>x.path.at(-1)===key);
@@ -51,15 +46,13 @@ const Equipment = (()=>{
     if(equips?.kind==='object')for(const n of equips.children)add(n,'동료 '+(friendName?.text||friend.path.at(-1))+' ('+friend.path.at(-1)+') · '+(group==='AddFriends'?'합류':'이탈')+' · 슬롯 '+n.path.at(-1));
    }
   }
-  const pools=new Map();
   for(const gear of gears){
-   const group=JSON.stringify([gear.name,gear.level]);if(!pools.has(group))pools.set(group,new Map());
-   for(const fx of gear.effects)pools.get(group).set(fx.id,fx);
-  }
-  for(const gear of gears){
-   const pool=new Map(pools.get(JSON.stringify([gear.name,gear.level])));
    gear.recommended=GameCatalog.gears[gear.name]?.options||[];
-   gear.choices=catalogChoices.concat([...pool.values()].filter(c=>!catalogIds.has(c.id)));
+   const def=AddCatalog.records.find(r=>r.kind==='equipment'&&r.id===gear.name);
+   gear.slotLimit=def?.slots??0;
+   const choices=new Map(gear.effects.map(x=>[x.id,x]));
+   for(const key of gear.recommended){const levels=[gear.level],id=JSON.stringify([key,levels]);choices.set(id,{id,key,levels,arrayRaw:levels[0]});}
+   gear.choices=[...choices.values()];
   }
   return {items,gears,itemByPath:new Map(items.map(x=>[x.path,x])),gearByPath:new Map(gears.map(x=>[x.path,x]))};
  }
@@ -72,13 +65,26 @@ const Equipment = (()=>{
   if(typeof value!=='string'||!valid.test(value)||Number(value)>1000000)throw Error((currency?'금액은 0':'수량은 1')+'~1,000,000 사이 정수로 입력하세요. 이는 편집기 제한이며 게임 상한 검증값은 아닙니다.');
   return value;
  }
+ function editable(gear){
+  if(!gear.recommended.length||gear.slotLimit<1)return '이 장비에 확인된 옵션 슬롯이 없습니다.';
+  if(!/^[1-7]$/.test(gear.level))return '장비 레벨이 확인된 생성 범위를 벗어납니다.';
+  if(gear.effects.some(f=>!gear.recommended.includes(f.key)||f.levels.some(v=>v!==gear.level)))return '기존 옵션에 생성 규칙 밖의 값이 있습니다. 원값을 보존하며 편집은 차단합니다.';
+  if(gear.effects.reduce((n,f)=>n+f.levels.length,0)>gear.slotLimit)return '기존 중첩 수가 정의의 슬롯 수를 초과합니다. 원값을 보존합니다.';
+  return '';
+ }
  function validateChoice(gear,ids){
-  if(!Array.isArray(ids)||ids.length!==gear.effects.length)throw Error('기존 옵션 개수는 유지해야 합니다.');
-  const available=new Map(gear.choices.map(x=>[x.id,x])),seen=new Set();
-  return ids.map(id=>{
-   const fx=available.get(id);if(!fx)throw Error('게임 정의 또는 기존 저장값에서 확인되지 않은 옵션·등급입니다.');
-   if(seen.has(fx.key))throw Error('같은 옵션 종류를 중복으로 선택할 수 없습니다.');seen.add(fx.key);return fx;
-  });
+  if(!Array.isArray(ids))throw Error('옵션 변경 목록 오류');
+  if(JSON.stringify(ids)===JSON.stringify(gear.effects.map(f=>f.id)))return gear.effects;
+  const reason=editable(gear);if(reason)throw Error(reason);
+  const group=new Map();let total=0;
+  for(const id of ids){let key,levels;try{[key,levels]=JSON.parse(id);}catch{throw Error('옵션 형식 오류');}
+   if(typeof key!=='string'||!gear.recommended.includes(key)||!Array.isArray(levels)||!levels.length||levels.some(v=>v!==gear.level))throw Error('장비별 후보 또는 확인된 생성 등급이 아닙니다.');
+   total+=levels.length;if(total>gear.slotLimit)throw Error('정의에서 확인한 슬롯 수를 넘습니다.');
+   if(!group.has(key))group.set(key,[]);group.get(key).push(...levels);
+  }
+  const original=gear.effects.reduce((n,f)=>n+f.levels.length,0);
+  if(total<original)throw Error('기존 옵션 중첩을 줄일 수 없습니다.');
+  return [...group].map(([key,levels])=>({id:JSON.stringify([key,levels]),key,levels,arrayRaw:levels.join(',')}));
  }
  function apply(doc,counts,options){
   const model=inspect(doc),replacements=[];
@@ -103,9 +109,9 @@ const Equipment = (()=>{
   const check=inspect(SaveCore.parse(out));
   if(check.items.length!==model.items.length||check.gears.length!==model.gears.length)throw Error('보유 개체 수가 달라졌습니다.');
   for(const [p,v] of counts)if(check.itemByPath.get(p)?.count!==v)throw Error('수량 재검증 실패');
-  for(const [p,ids] of options)if(JSON.stringify(check.gearByPath.get(p)?.effects.map(x=>x.id))!==JSON.stringify(ids))throw Error('옵션 재검증 실패');
+  for(const [p,ids] of options)if(JSON.stringify(check.gearByPath.get(p)?.effects.map(x=>x.id))!==JSON.stringify(validateChoice(model.gearByPath.get(p),ids).map(x=>x.id)))throw Error('옵션 재검증 실패');
   return out;
  }
- return {inspect,effectLabel,number,validateChoice,apply,money,isMoney};
+ return {inspect,effectLabel,number,validateChoice,apply,money,isMoney,editable};
 })();
 if(typeof module!=='undefined')module.exports=Equipment;

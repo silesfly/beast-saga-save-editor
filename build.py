@@ -12,11 +12,11 @@ args = parser.parse_args()
 sdk = args.webview2.resolve()
 src, out = ROOT / 'src', ROOT / 'dist'
 out.mkdir(exist_ok=True)
-version = '0.9'
+version = '0.10'
 html = (src / 'equipment-page.html').read_text(encoding='utf-8')
-modules = [('CORE', 'item-core'), ('CATALOG', 'catalog'), ('EQUIPMENT', 'equipment'),
+modules = [('CORE', 'item-core'), ('CATALOG', 'catalog'), ('ADDCATALOG','add-catalog'), ('ADDITIONS','additions'), ('EQUIPMENT', 'equipment'),
            ('STATCATALOG', 'stat-catalog'), ('STATS', 'stats'), ('FRIENDS', 'friends'),
-           ('POINTS', 'points'), ('CATEGORIES', 'categories'), ('LIST', 'inventory-list'), ('UI', 'equipment-ui')]
+           ('POINTS', 'points'), ('CATEGORIES', 'categories'), ('LIST', 'inventory-list'), ('UI', 'equipment-ui'), ('ADDUI','add-ui')]
 for marker, name in modules:
     html = html.replace('/* ' + marker + ' */', (src / (name + '.js')).read_text(encoding='utf-8'))
 html_path = out / f'BeastSagaEquipmentEditor-v{version}.html'

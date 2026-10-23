@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert/strict');
 const ctx=vm.createContext({TextEncoder,TextDecoder,Uint8Array,Map,Set});
-for(const name of ['item-core','catalog','equipment','categories','inventory-list','stat-catalog','stats','friends','points'])
+for(const name of ['item-core','catalog','add-catalog','equipment','categories','inventory-list','stat-catalog','stats','friends','points'])
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',name+'.js'),'utf8'),ctx);
 const {C,E,L,P,S,F}=vm.runInContext('({C:SaveCore,E:Equipment,L:InventoryList,P:PlayerPoints,S:PlayerStats,F:FriendStats})',ctx);
 const base='/savePlayerData/value/ItemHad/铜钱';
