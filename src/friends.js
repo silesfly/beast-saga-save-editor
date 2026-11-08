@@ -1,11 +1,68 @@
 'use strict';
 const FriendStats=(()=>{
- const base='/saveFriendData/value',f=Math.fround;
+ const base='/saveFriendData/value',loveRoot='/savePlayerData/value/FriendLoveNum',f=Math.fround;
  const six=PlayerStats.definitions.slice(1,7).map(([k,label])=>[k,label]);
  const definitions=[...six,['WuXing','오성'],['remainingPro','남은 능력치 포인트'],['remainingTalent','남은 특성 포인트']];
+ const loveTable=[
+  {slot:1,name:'兔千千',id:'tuqianqian',ko:'토천천',init:0,show:1,shixindan:'第五章邪线喂兔千千尸心丹',note:'황우곡 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:2,name:'狼渊',id:'langyuan',ko:'랑연',init:0,show:1,shixindan:'第五章邪线喂狼渊尸心丹',note:'백령어 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:3,name:'鼠三娘',id:'shusanniang',ko:'서삼랑',init:0,show:1,shixindan:'第五章邪线喂鼠三娘尸心丹',note:'곤륜신교 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:4,name:'狮逍',id:'shixiao',ko:'사소',init:10,show:1,shixindan:'第五章邪线喂狮逍尸心丹',note:'필보산장 영입 · 초기 호감도 10 · 시심단 변수 할당'},
+  {slot:5,name:'猴千冲',id:'houqianchong',ko:'후천충',init:0,show:1,shixindan:null,note:'오자사 영입 · 시심단 변수 없음'},
+  {slot:6,name:'猫春也',id:'maochunye',ko:'묘춘야',init:0,show:1,shixindan:'第五章邪线喂猫春也尸心丹',note:'파도천궁 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:7,name:'猫花来',id:'maohualai',ko:'묘화래',init:0,show:1,shixindan:'第五章邪线喂猫花来尸心丹',note:'파도천궁 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:8,name:'藏玲珑',id:'zanglinglong',ko:'장영롱',init:0,show:1,shixindan:'第五章邪线喂藏玲珑尸心丹',note:'궁공파 영입 · 5장 악 노선 시심단 변수 할당'},
+  {slot:9,name:'阿守',id:'Ashou',ko:'아수',init:90,show:0,shixindan:null,note:'소촌 초기 동료 · 초기 호감도 90 고정'},
+  {slot:10,name:'狼萤',id:'langying',ko:'랑형',init:30,show:0,shixindan:null,note:'황천곡 합류 · 초기 호감도 30'},
+  {slot:11,name:'无常',id:'wuchang',ko:'무상',init:0,show:0,shixindan:null,note:'곤붕교 회유·구출 분기 슬롯'},
+  {slot:12,name:'忘忧',id:'wangyou',ko:'망우',init:0,show:0,shixindan:null,note:'안거성 정보 거래·구판 중립/악 노선 슬롯'},
+  {slot:13,name:'三里',id:'sanli',ko:'삼리',init:0,show:0,shixindan:null,note:'문파·서브 사건 연동 내부 슬롯'},
+  {slot:14,name:'不周',id:'buzhou',ko:'부주',init:0,show:0,shixindan:null,note:'필보산장 협방·후반 곤붕교 회유 슬롯'},
+  {slot:15,name:'枯冢',id:'kuzhong',ko:'고총',init:0,show:0,shixindan:null,note:'곤붕교·후반 사건 연동 내부 슬롯'},
+  {slot:16,name:'寿',id:'shou',ko:'수',init:0,show:0,shixindan:null,note:'안거성 고분·황우곡 변호 합류 슬롯'},
+  {slot:17,name:'鹿柒',id:'luxi',ko:'녹칠',init:10,show:1,shixindan:null,note:'순하장·관성탑 메인 히로인 · 초기 호감도 10'},
+  {slot:18,name:'蛇形',id:'shexing',ko:'사형',init:20,show:1,shixindan:null,note:'박인도·광림성 영입 · 초기 호감도 20'},
+  {slot:19,name:'狼萤2',id:'langying2',ko:'랑형 (후반)',init:30,show:0,shixindan:null,note:'후반 분기 전용 2번째 슬롯 · 초기 호감도 30'},
+  {slot:20,name:'福',id:'fu',ko:'부 (복)',init:15,show:0,shixindan:null,note:'금당도 만진각 생존 분기 · 초기 호감도 15'},
+  {slot:21,name:'象凌霜',id:'xianglingshuang',ko:'상릉상',init:30,show:0,shixindan:null,note:'칠요궁 합류 · 초기 호감도 30'},
+  {slot:22,name:'象凌霜2',id:'xianglingshuang2',ko:'상릉상 (후반)',init:30,show:0,shixindan:null,note:'칠요궁 후반 분기 2번째 슬롯 · 초기 호감도 30'},
+  {slot:23,name:'狼九思',id:'langjiusi',ko:'랑구사',init:0,show:0,shixindan:null,note:'개편판 23번째 확장 슬롯'}
+ ];
+ const loveById=new Map(loveTable.map(x=>[x.id,x])),loveByName=new Map(loveTable.map(x=>[x.name,x]));
+ function inspectLove(doc){
+  const rootNode=doc.byPath.get(loveRoot);
+  if(rootNode&&rootNode.kind!=='object')throw Error('동료 호감도(FriendLoveNum) 형식이 올바르지 않습니다.');
+  return loveTable.map(entry=>{
+   const ptr=loveRoot+'/'+entry.name,node=doc.byPath.get(ptr);
+   const present=node?.kind==='number'&&/^-?\d+$/.test(node.raw);
+   return {...entry,ptr,present,value:present?node.raw:String(entry.init)};
+  });
+ }
+ function loveFields(doc){
+  const out={};for(const x of inspectLove(doc))if(x.present)out[x.id]=x.value;return out;
+ }
+ function calculateLove(doc,values){
+  if(!values||typeof values!=='object')throw Error('지원하지 않는 동료 호감도 항목');
+  const entries=inspectLove(doc),byId=new Map(entries.map(x=>[x.id,x])),byName=new Map(entries.map(x=>[x.name,x])),byPtr=new Map(entries.map(x=>[x.ptr,x]));
+  const normalized={},changes=new Map(),pairs=values instanceof Map?[...values.entries()]:Object.entries(values);
+  for(const [k,raw] of pairs){
+   const entry=byId.get(k)||byName.get(k)||byPtr.get(k);
+   if(!entry||!entry.present)throw Error('세이브에 기록된 동료 호감도 슬롯만 수정할 수 있습니다: '+k);
+   const s=String(raw);
+   if(!/^(0|[1-9]\d{0,3})$/.test(s)||Number(s)>1000)throw Error(entry.ko+' 호감도는 0~1,000 정수로 입력하세요.');
+   const v=Number(s),node=doc.byPath.get(entry.ptr);
+   normalized[entry.id]=String(v);
+   if(Number(node.raw)!==v)changes.set(entry.ptr,String(v));
+  }
+  return {values:normalized,changes};
+ }
+ function applyLove(doc,values){return SaveCore.patch(doc,calculateLove(doc,values).changes);}
  function inspect(doc){
   const all=[];for(const group of ['AddFriends','LeaveFriends']){const n=doc.byPath.get(base+'/'+group);if(!n)continue;if(n.kind!=='object')throw Error('동료 목록 형식이 올바르지 않습니다.');
-   for(const x of n.children){if(x.kind!=='object')continue;const name=x.children.find(c=>c.path.at(-1)==='_Name');all.push({path:x.ptr,id:x.path.at(-1),name:name?.kind==='string'?name.text:x.path.at(-1),group:group==='AddFriends'?'합류':'이탈'});}
+   for(const x of n.children){if(x.kind!=='object')continue;const name=x.children.find(c=>c.path.at(-1)==='_Name');
+    const id=x.path.at(-1),nm=name?.kind==='string'?name.text:id,meta=loveById.get(id)||loveByName.get(nm)||null;
+    const lovePtr=meta?loveRoot+'/'+meta.name:null,loveNode=lovePtr?doc.byPath.get(lovePtr):null,hasLove=loveNode?.kind==='number'&&/^-?\d+$/.test(loveNode.raw);
+    all.push({path:x.ptr,id,name:nm,ko:meta?.ko||nm,group:group==='AddFriends'?'합류':'이탈',loveSlot:meta?.slot||null,initLove:meta?.init??null,shixindan:meta?.shixindan||null,lovePath:hasLove?lovePtr:null,love:hasLove?loveNode.raw:null});}
   }return all;
  }
  function data(doc,path){if(!inspect(doc).some(x=>x.path===path))throw Error('저장에 있는 동료만 수정할 수 있습니다.');return PlayerStats.read(doc.byPath.get(path));}
@@ -56,6 +113,6 @@ const FriendStats=(()=>{
    for(const k of ['_BaseHp','_MaxHp','_Hp'])floatPaths.add(path+'/'+k);
   }return SaveCore.patch(doc,changes,floatPaths);
  }
- return {definitions,inspect,data,fields,validate,hp,calculate,apply};
+ return {definitions,loveTable,inspect,inspectLove,loveFields,calculateLove,applyLove,data,fields,validate,hp,calculate,apply};
 })();
 if(typeof module!=='undefined')module.exports=FriendStats;
