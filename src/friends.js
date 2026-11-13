@@ -34,7 +34,9 @@ const FriendStats=(()=>{
   if(rootNode&&rootNode.kind!=='object')throw Error('동료 호감도(FriendLoveNum) 형식이 올바르지 않습니다.');
   return loveTable.map(entry=>{
    const ptr=loveRoot+'/'+entry.name,node=doc.byPath.get(ptr);
-   const present=node?.kind==='number'&&/^-?\d+$/.test(node.raw);
+   if(node!==undefined&&(node.kind!=='number'||!/^-?\d+$/.test(node.raw)))throw Error('동료 호감도(FriendLoveNum) 값 형식이 올바르지 않습니다: '+entry.name);
+   if(node!==undefined){const v=Number(node.raw);if(!Number.isInteger(v)||v<-2147483648||v>2147483647)throw Error('동료 호감도 저장 범위 오류: '+entry.name);}
+   const present=node!==undefined;
    return {...entry,ptr,present,value:present?node.raw:String(entry.init)};
   });
  }
@@ -42,17 +44,21 @@ const FriendStats=(()=>{
   const out={};for(const x of inspectLove(doc))if(x.present)out[x.id]=x.value;return out;
  }
  function calculateLove(doc,values){
-  if(!values||typeof values!=='object')throw Error('지원하지 않는 동료 호감도 항목');
+  if(Array.isArray(values)||!values||typeof values!=='object')throw Error('지원하지 않는 동료 호감도 항목');
+  const seen=new Set();
   const entries=inspectLove(doc),byId=new Map(entries.map(x=>[x.id,x])),byName=new Map(entries.map(x=>[x.name,x])),byPtr=new Map(entries.map(x=>[x.ptr,x]));
   const normalized={},changes=new Map(),pairs=values instanceof Map?[...values.entries()]:Object.entries(values);
   for(const [k,raw] of pairs){
    const entry=byId.get(k)||byName.get(k)||byPtr.get(k);
    if(!entry||!entry.present)throw Error('세이브에 기록된 동료 호감도 슬롯만 수정할 수 있습니다: '+k);
+   if(seen.has(entry.id))throw Error('중복된 동료 호감도 항목입니다: '+entry.ko);
+   seen.add(entry.id);
    const s=String(raw);
    if(!/^(0|[1-9]\d{0,3})$/.test(s)||Number(s)>1000)throw Error(entry.ko+' 호감도는 0~1,000 정수로 입력하세요.');
    const v=Number(s),node=doc.byPath.get(entry.ptr);
    normalized[entry.id]=String(v);
    if(Number(node.raw)!==v)changes.set(entry.ptr,String(v));
+   else changes.delete(entry.ptr);
   }
   return {values:normalized,changes};
  }

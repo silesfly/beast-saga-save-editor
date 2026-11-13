@@ -34,6 +34,7 @@ test('money and ordinary item edits share one map',()=>{
  const out=E.apply(d,new Map([[base,'100'],[other.path,'55']]),new Map()),r=E.inspect(C.parse(out));
  assert.equal(E.money(r).count,'100');assert.equal(r.itemByPath.get(other.path).count,'55');
 });
+const spliceExpected=(src,doc,pairs)=>{const spans=pairs.map(([ptr,val])=>{const n=doc.byPath.get(ptr);assert.ok(n,'missing '+ptr);return [n.start,n.end,Buffer.from(String(val))];}).sort((a,b)=>b[0]-a[0]);let buf=Buffer.from(src);for(const [s,e,rep] of spans)buf=Buffer.concat([buf.subarray(0,s),rep,buf.subarray(e)]);return buf;};
 test('9 life skills (LifeExp/0..8) and points round-trip with 4-key and 12-key inputs',()=>{
  const lifeFixture=Buffer.from(JSON.stringify({
   savePlayerData:{__type:'PlayerData, Assembly-CSharp',value:{
@@ -42,8 +43,9 @@ test('9 life skills (LifeExp/0..8) and points round-trip with 4-key and 12-key i
    LifeExp:{0:0,1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0}
   }},
   saveInfoData:{value:{}},
-  tail:'keep-exact'
- }));
+  tail:'keep-exact',
+  extra:[1,2,3]
+ },null,2));
  const d=C.parse(lifeFixture),f0=P.fields(d);
  assert.equal(P.lifeSkills.length,9);
  assert.equal(f0.MedicineLevel,'1');assert.equal(f0.ForgeLevel,'1');assert.equal(f0.LockpickLevel,'1');
@@ -54,14 +56,30 @@ test('9 life skills (LifeExp/0..8) and points round-trip with 4-key and 12-key i
  assert.equal(f4.TalentAdd,'20');assert.equal(f4.AddProSpot,'30');assert.equal(f4.MedicineLevel,'45');assert.equal(f4.LifePoints,'3');
  assert.equal(d4.byPath.get('/savePlayerData/value/LifeExp/4').raw,String(P.thresholds[44]));
  assert.equal(d4.byPath.get('/savePlayerData/value/LifeExp/0').raw,'0');
+ assert.deepEqual(out4,spliceExpected(lifeFixture,d,[
+  ['/savePlayerData/value/TalentAdd','20'],
+  ['/savePlayerData/value/AddProSpot','30'],
+  ['/savePlayerData/value/LifeExp/4',P.thresholds[44]],
+  ['/savePlayerData/value/UseLifePeak','1']
+ ]));
  // 12-key multi-life-skill edit (Forge=15, Medicine=45, Fish=40, Lockpick=60)
  const out12=Buffer.from(P.apply(d,{...f0,TalentAdd:'30',AddProSpot:'50',LifePoints:'10',ForgeLevel:'15',MedicineLevel:'45',FishLevel:'40',LockpickLevel:'60'}));
  const d12=C.parse(out12),f12=P.fields(d12);
  assert.equal(f12.ForgeLevel,'15');assert.equal(f12.MedicineLevel,'45');assert.equal(f12.FishLevel,'40');assert.equal(f12.LockpickLevel,'60');
  assert.equal(f12.LifePoints,'10');assert.equal(f12.CraftLevel,'1');
  assert.equal(d12.byPath.get('/savePlayerData/value/LifeExp/0').raw,String(P.thresholds[14]));
+ assert.equal(d12.byPath.get('/savePlayerData/value/LifeExp/4').raw,String(P.thresholds[44]));
  assert.equal(d12.byPath.get('/savePlayerData/value/LifeExp/5').raw,String(P.thresholds[39]));
  assert.equal(d12.byPath.get('/savePlayerData/value/LifeExp/8').raw,String(P.thresholds[59]));
+ assert.deepEqual(out12,spliceExpected(lifeFixture,d,[
+  ['/savePlayerData/value/TalentAdd','30'],
+  ['/savePlayerData/value/AddProSpot','50'],
+  ['/savePlayerData/value/LifeExp/0',P.thresholds[14]],
+  ['/savePlayerData/value/LifeExp/4',P.thresholds[44]],
+  ['/savePlayerData/value/LifeExp/5',P.thresholds[39]],
+  ['/savePlayerData/value/LifeExp/8',P.thresholds[59]],
+  ['/savePlayerData/value/UseLifePeak','5']
+ ]));
  assert.throws(()=>P.apply(d,{...f0,ForgeLevel:'101'}));
  assert.throws(()=>P.apply(d,{...f0,LockpickLevel:'0'}));
  assert.throws(()=>P.apply(d,{...f0,LifePoints:'1'}),/생활 기술 레벨을 11 이상/);
@@ -70,6 +88,7 @@ test('9 life skills (LifeExp/0..8) and points round-trip with 4-key and 12-key i
  assert.equal(fForge.LifePoints,'1');assert.equal(fForge.MedicineLevel,'1');assert.equal(fForge.ForgeLevel,'11');
  assert.equal(dForge.byPath.get('/savePlayerData/value/LifeExp/0').raw,String(P.thresholds[10]));
  assert.equal(dForge.byPath.get('/savePlayerData/value/UseLifePeak').raw,'0');
+ assert.deepEqual(outForge,spliceExpected(lifeFixture,d,[['/savePlayerData/value/LifeExp/0',P.thresholds[10]]]));
 });
 test('23-slot FriendLoveTable metadata and FriendLoveNum byte-exact editing',()=>{
  assert.equal(F.loveTable.length,23);
@@ -80,8 +99,10 @@ test('23-slot FriendLoveTable metadata and FriendLoveNum byte-exact editing',()=
    FriendLoveNum:{'鹿柒':10,'兔千千':25,'阿守':90}
   }},
   saveFriendData:{value:{AddFriends:{luxi:{_Name:'鹿柒',_Lv:20}},LeaveFriends:{Ashou:{_Name:'阿守',_Lv:15}}}},
-  saveInfoData:{value:{}}
- }));
+  saveInfoData:{value:{}},
+  tail:'keep-exact',
+  extra:[1,2,3]
+ },null,2));
  const d=C.parse(loveFixture),entries=F.inspectLove(d);
  assert.equal(entries.length,23);
  assert.equal(entries.filter(x=>x.present).length,3);
@@ -94,9 +115,17 @@ test('23-slot FriendLoveTable metadata and FriendLoveNum byte-exact editing',()=
  assert.equal(d2.byPath.get('/savePlayerData/value/FriendLoveNum/鹿柒').raw,'60');
  assert.equal(d2.byPath.get('/savePlayerData/value/FriendLoveNum/兔千千').raw,'100');
  assert.equal(d2.byPath.get('/savePlayerData/value/FriendLoveNum/阿守').raw,'90');
+ assert.deepEqual(out,spliceExpected(loveFixture,d,[
+  ['/savePlayerData/value/FriendLoveNum/鹿柒','60'],
+  ['/savePlayerData/value/FriendLoveNum/兔千千','100']
+ ]));
  assert.throws(()=>F.applyLove(d,{wuchang:'60'}));
  assert.throws(()=>F.applyLove(d,{luxi:'1001'}));
  assert.throws(()=>F.applyLove(d,{luxi:'-1'}));
+ assert.throws(()=>F.calculateLove(d,new Map([['luxi','60'],['鹿柒','10']])),/중복된 동료 호감도 항목/);
+ assert.throws(()=>F.applyLove(d,{luxi:'60','/savePlayerData/value/FriendLoveNum/鹿柒':'10'}),/중복된 동료 호감도 항목/);
+ assert.throws(()=>F.inspectLove({...d,byPath:new Map(d.byPath).set('/savePlayerData/value/FriendLoveNum','bad')}));
+ assert.throws(()=>F.inspectLove({...d,byPath:new Map(d.byPath).set('/savePlayerData/value/FriendLoveNum/鹿柒','bad')}));
 });
 if(process.argv[2]){
  const bytes=fs.readFileSync(process.argv[2]),d=C.parse(bytes),m=E.inspect(d);

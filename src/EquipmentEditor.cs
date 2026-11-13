@@ -17,8 +17,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Beast Saga Equipment Editor")]
 [assembly: AssemblyProduct("Beast Saga Equipment Editor")]
-[assembly: AssemblyVersion("0.11.0.0")]
-[assembly: AssemblyFileVersion("0.11.0.0")]
+[assembly: AssemblyVersion("0.11.1.0")]
+[assembly: AssemblyFileVersion("0.11.1.0")]
 
 internal static class Program {
     internal static string RuntimeFolder;
@@ -70,7 +70,7 @@ internal static class Program {
                 // A separate application-owned cache, never an existing browser profile.
                 string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BeastSagaEquipmentEditor");
                 NoLinks(root); Directory.CreateDirectory(root);
-                RuntimeFolder = Path.Combine(root, "runtime-0.11"); NoLinks(RuntimeFolder);
+                RuntimeFolder = Path.Combine(root, "runtime-0.11.1"); NoLinks(RuntimeFolder);
                 Directory.CreateDirectory(RuntimeFolder);
             }
             string loader = Path.Combine(RuntimeFolder, "WebView2Loader.dll");
@@ -97,10 +97,10 @@ internal static class Program {
 
 internal sealed class EditorForm : Form {
     readonly WebView2 web=new WebView2();
-    bool working,closingAllowed,firstNavigation=true,selfTestStarted,catalogVerified;
+    bool working,closingAllowed,firstNavigation=true,initialLoaded,selfTestStarted,catalogVerified;
     string activePath,activeHash,session,lastBackup;
     public EditorForm(){
-        Text="영수강호 · 세이브 편집기 0.11 · 자동 백업 저장";
+        Text="영수강호 · 세이브 편집기 0.11.1 · 자동 백업 저장";
         ClientSize=new Size(1280,900);MinimumSize=new Size(900,650);StartPosition=FormStartPosition.CenterScreen;
         web.Dock=DockStyle.Fill;Controls.Add(web);
         if(Program.TestRoot!=null){ShowInTaskbar=false;WindowState=FormWindowState.Minimized;}
@@ -129,13 +129,15 @@ internal sealed class EditorForm : Form {
             web.CoreWebView2.Settings.AreHostObjectsAllowed=false;
             web.CoreWebView2.NewWindowRequested+=(s,e)=>e.Handled=true;
             web.CoreWebView2.PermissionRequested+=(s,e)=>e.State=CoreWebView2PermissionState.Deny;
-            web.CoreWebView2.NavigationStarting+=(s,e)=>{bool allowed=firstNavigation&&e.Uri.StartsWith("data:text/html",StringComparison.OrdinalIgnoreCase);firstNavigation=false;if(!allowed)e.Cancel=true;};
+            web.CoreWebView2.NavigationStarting+=(s,e)=>{bool allowed=firstNavigation&&(e.Uri.StartsWith("data:text/html",StringComparison.OrdinalIgnoreCase)||String.Equals(e.Uri,"about:blank",StringComparison.OrdinalIgnoreCase));firstNavigation=false;if(!allowed)e.Cancel=true;};
             web.CoreWebView2.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
             web.CoreWebView2.WebResourceRequested+=(s,e)=>{if(e.Request.Uri.StartsWith("http:")||e.Request.Uri.StartsWith("https:"))e.Response=env.CreateWebResourceResponse(new MemoryStream(new byte[0]),403,"Offline","");};
             web.CoreWebView2.DownloadStarting+=(s,e)=>{e.Cancel=true;e.Handled=true;};
             web.CoreWebView2.WebMessageReceived+=Receive;
             web.CoreWebView2.NavigationCompleted+=(s,e)=>{
+                if(initialLoaded)return;
                 if(!e.IsSuccess){Fail(new IOException("화면 로드 실패: "+e.WebErrorStatus));return;}
+                initialLoaded=true;
                 if(Program.TestRoot!=null&&!selfTestStarted){selfTestStarted=true;BeginInvoke(new Action(async()=>await SelfTest()));}
             };
             web.CoreWebView2.NavigateToString(Encoding.UTF8.GetString(Program.Resource("editor.html")));
@@ -269,7 +271,12 @@ internal sealed class EditorForm : Form {
               $('itemsTab').click();const cloth=model.items.find(x=>x.name==='3妆花缎');choose(cloth);inputTest('quantity','9999');
               const ring=model.gearByPath.get('/savePlayerData/value/PlayerDressEquip/6');tab='gears';choose(ring);
               $('effect0').value='抗毒增加';$('effect0').dispatchEvent(new Event('change',{bubbles:true}));
-              if(FriendStats.inspectLove(doc).length!==23)throw Error('호감도 23슬롯 오류');
+              const loveAll=FriendStats.inspectLove(doc);if(loveAll.length!==23)throw Error('호감도 23슬롯 오류');
+              const lovePresent=loveAll.find(x=>x.present);if(!lovePresent)throw Error('기록된 호감도 슬롯 없음');
+              window.testedLoveId=lovePresent.id;window.testedLovePtr=lovePresent.ptr;window.testedLoveNext=lovePresent.value==='77'?'78':'77';
+              inputTest('friendLove_'+testedLoveId,testedLoveNext);
+              const subDoc=SaveCore.parse(new TextEncoder().encode(JSON.stringify({savePlayerData:{__type:'PlayerData, Assembly-CSharp',value:{ItemHad:{},FriendLoveNum:{'鹿柒':10}}},saveInfoData:{value:{}}})));
+              if(!FriendStats.inspectLove(subDoc).some(x=>!x.present)||SaveCore.parse(FriendStats.applyLove(subDoc,{luxi:'60'})).byPath.has('/savePlayerData/value/FriendLoveNum/无常'))throw Error('미기록 호감도 보존 오류');
               $('codeAtlasSearch').value='의술 해금';$('codeAtlasSearch').oninput();
               if(!($('editorCodeAtlasBody').querySelectorAll('tr').length-1>=1&&$('editorCodeAtlasBody').querySelectorAll('tr').length-1<38))throw Error('코드 사전 다중 검색 오류');
               $('codeAtlasReset').click();
@@ -278,6 +285,7 @@ internal sealed class EditorForm : Form {
             ");
             await Until("!busy && pendingSize()===0 && (/^(세이브|복사본) 저장 완료/).test($('status').textContent)");
             await Until("doc.byPath.get('/savePlayerData/value/PhysicalPower').raw==='500' && doc.byPath.get('/savePlayerData/value/SixProCurrent/4').raw==='500' && Number(doc.byPath.get('/savePlayerData/value/_MaxHp').raw)>15000");
+            await Until("doc.byPath.get(testedLovePtr).raw===testedLoveNext && friendLoveValues===null");
             await Until("doc.byPath.get('/saveFriendData/value/AddFriends/luxi/_PhysicalPower').raw==='500' && doc.byPath.get('/saveFriendData/value/LeaveFriends/Ashou/_Power').raw==='99' && friendPending.size===0");
             await web.CoreWebView2.ExecuteScriptAsync("$('pointsTab').click()");
             await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50' && $('pointForgeLevel').value==='15'");
@@ -291,6 +299,8 @@ internal sealed class EditorForm : Form {
             if(SaveStore.Hash(SaveStore.Read(lastBackup))!=SaveStore.Hash(first))throw new IOException("두 번째 저장 백업 불일치");
             await web.CoreWebView2.ExecuteScriptAsync("$('nativeOpen').click()");
             await Until("!busy && model!==null");
+            await web.CoreWebView2.ExecuteScriptAsync("$('friendsTab').click()");
+            await Until("$('friendLove_'+testedLoveId).value===testedLoveNext && doc.byPath.get(testedLovePtr).raw===testedLoveNext && !hasEdits()");
             await web.CoreWebView2.ExecuteScriptAsync("$('pointsTab').click()");
             await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50' && $('pointForgeLevel').value==='15' && Equipment.money(model).count==='1000000' && !hasEdits()");
             await web.CoreWebView2.ExecuteScriptAsync("$('moneyButton').click();inputTest('quantity','0');$('export').click()");
@@ -318,7 +328,7 @@ internal sealed class EditorForm : Form {
             await web.CoreWebView2.ExecuteScriptAsync("$('addTab').click();$('catalogState').value='candidate';renderAdd();");
             string catalogUi=await web.CoreWebView2.ExecuteScriptAsync("JSON.stringify({categories:$('catalogTree').children.length,visible:!$('addPanel').hidden,verified:catalogVerified})");
             Program.WriteNew(Path.Combine(Program.TestRoot,"catalog-ui.json"),Encoding.UTF8.GetBytes(catalogUi));
-            var record=new Dictionary<string,object>{{"status","PASS"},{"categoryTreeNewItemAndOptionCopyRoundTrip",true},{"originalPreservedOnFeatureCopy",true},{"catalogHashVerified",true},{"moneyMaxAndZeroSavedReopened",true},{"moneyInvalidBlockedAndDraftPreserved",true},{"nativeOpenToUi",true},{"pointsSavedAndReopened",true},{"categoryFilterAndDraftPreserved",true},{"allPagesCoveredExactlyOnce",true},{"beyond200EditSaved",true},{"autoQueueWithoutStageButton",true},{"joinedAndDepartedCompanionEdit",true},{"uiStatsAutoHp",true},{"uiDropdownToSave",true},{"sameSlotReplaced",true},{"firstBackupExact",true},{"secondBackupExact",true},{"pendingClearedAfterAck",true},{"inputHash",SaveStore.Hash(original)},{"resultHash",SaveStore.Hash(SaveStore.Read(activePath))},{"htmlHash",SaveStore.Hash(Program.Resource("editor.html"))}};
+            var record=new Dictionary<string,object>{{"status","PASS"},{"categoryTreeNewItemAndOptionCopyRoundTrip",true},{"originalPreservedOnFeatureCopy",true},{"catalogHashVerified",true},{"moneyMaxAndZeroSavedReopened",true},{"moneyInvalidBlockedAndDraftPreserved",true},{"nativeOpenToUi",true},{"pointsSavedAndReopened",true},{"categoryFilterAndDraftPreserved",true},{"allPagesCoveredExactlyOnce",true},{"beyond200EditSaved",true},{"autoQueueWithoutStageButton",true},{"joinedAndDepartedCompanionEdit",true},{"uiStatsAutoHp",true},{"uiDropdownToSave",true},{"friendLoveSavedAndReopened",true},{"sameSlotReplaced",true},{"firstBackupExact",true},{"secondBackupExact",true},{"pendingClearedAfterAck",true},{"inputHash",SaveStore.Hash(original)},{"resultHash",SaveStore.Hash(SaveStore.Read(activePath))},{"htmlHash",SaveStore.Hash(Program.Resource("editor.html"))}};
             Program.WriteNew(Path.Combine(Program.TestRoot,"receipt.json"),Encoding.UTF8.GetBytes(Program.Json.Serialize(record)));
             closingAllowed=true;Close();
         }catch(Exception ex){Fail(ex);}

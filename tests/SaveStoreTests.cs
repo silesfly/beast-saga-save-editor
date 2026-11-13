@@ -31,6 +31,18 @@ class SaveStoreTests {
   Reject(()=>SaveStore.CopyWithBackup(target,copy,SaveStore.Hash(c),a),"Copy cannot overwrite existing destination");
   string staleCopy=Path.Combine(root,"stale-copy.es3");Reject(()=>SaveStore.CopyWithBackup(target,staleCopy,SaveStore.Hash(a),b),"Stale source blocks copy");
   Assert(!File.Exists(staleCopy),"Stale copy failure creates no target");
+  string failedCopy=Path.Combine(root,"failed-copy.es3");
+  try {
+   SaveStore.CopyWithBackup(target,failedCopy,SaveStore.Hash(c),b,(s,d)=>{s.Write(d,0,1);throw new IOException("injected copy fault");});
+   throw new Exception("Expected copy write failure");
+  } catch(IOException ex) {
+   Assert(ex.Message.Contains(".original-")&&ex.Message.Contains(".bak"),"Copy write failure reports preserved backup");
+  }
+  Assert(!File.Exists(failedCopy),"Failed copy leaves no partial destination .es3");
+  Assert(Directory.GetFiles(root,"*.pending-*").Length==0,"Failed copy cleans up pending temp file");
+  Assert(SaveStore.Read(target).SequenceEqual(c),"Failed copy preserves source");
+  string retryBackup=SaveStore.CopyWithBackup(target,failedCopy,SaveStore.Hash(c),b);
+  Assert(SaveStore.Read(failedCopy).SequenceEqual(b)&&SaveStore.Read(retryBackup).SequenceEqual(c),"Retry to same copy destination succeeds cleanly");
   Console.WriteLine("ALL PASS");return 0;
  }
  class FaultStream:MemoryStream {

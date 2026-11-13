@@ -21,6 +21,7 @@ function sync(){
  $('backup').disabled=!doc||busy; $('file').disabled=busy; if($('nativeOpen'))$('nativeOpen').disabled=busy; $('export').disabled=!doc||busy||pendingSize()===0||invalidDrafts.size>0;
  $('clear').disabled=busy||!hasEdits();$('stage').disabled=!selected||busy||tab==='gears'&&!!Equipment.editable(selected);
  for(const el of document.querySelectorAll('#fields input,#fields select,#statsFields input,#friendFields input,#friendLoveFields input,#friendPicker,#pointsFields input'))el.disabled=busy||el.dataset.locked==='true';
+ for(const el of document.querySelectorAll('#editorQuickHelper button'))el.disabled=busy;
  $('stageStats').disabled=!doc||busy||!statsReady;
  syncListControls();
  $('pendingCount').textContent=(pendingSize())+'개 대상 변경 대기';
@@ -220,7 +221,7 @@ function renderStats(){
   previewStats();
  }catch(e){$('statsPreview').textContent=e.message;$('statsPreview').className='error';$('stageStats').disabled=true;}
 }
-function statInputs(){return Object.fromEntries(PlayerStats.definitions.map(([key])=>[key,$('stat'+key).value]));}
+function statInputs(){PlayerStats.fields(doc);if(!$('statsFields')?.children?.length)throw Error('주인공 능력치 입력란이 준비되지 않았습니다.');return Object.fromEntries(PlayerStats.definitions.map(([key])=>{const el=$('stat'+key);if(!el)throw Error('주인공 능력치 입력란이 준비되지 않았습니다.');return [key,el.value];}));}
 function previewStats(){
  const preview=$('statsPreview');preview.replaceChildren();statsReady=false;
  try{
@@ -232,7 +233,7 @@ function previewStats(){
  }catch(e){preview.className='error';preview.textContent=e.message;$('stageStats').disabled=true;}
 }
 $('stageStats').onclick=()=>queueStats(true);
-function queueStats(force=false){if(busy||!doc)return;statDraft=statInputs();try{const d=SaveCore.parse(Equipment.apply(doc,new Map(),options)),r=PlayerStats.calculate(d,statDraft);statValues=force||r.changes.size?{...statDraft}:null;invalidDrafts.delete('stats');revision++;pending();msg('능력치 변경이 자동 반영됐습니다. 세이브 저장을 누르면 기혈도 함께 적용됩니다.');}catch(e){invalidDrafts.set('stats',e.message);pending();msg(e.message,true);}}
+function queueStats(force=false){if(busy||!doc)return false;try{statDraft=statInputs();const d=SaveCore.parse(Equipment.apply(doc,new Map(),options)),r=PlayerStats.calculate(d,statDraft);statValues=force||r.changes.size?{...statDraft}:null;invalidDrafts.delete('stats');revision++;pending();msg('능력치 변경이 자동 반영됐습니다. 세이브 저장을 누르면 기혈도 함께 적용됩니다.');return true;}catch(e){invalidDrafts.set('stats',e.message);pending();msg(e.message,true);return false;}}
 
 
 function stagedEquipment(){return options.size?SaveCore.parse(Equipment.apply(doc,new Map(),options)):doc;}
@@ -242,13 +243,13 @@ function renderFriends(){
  if($('friendLoveFields'))$('friendLoveFields').replaceChildren();if($('friendLovePreview'))$('friendLovePreview').textContent='';
  if(!doc)return;
  renderFriendLove();
- const all=FriendStats.inspect(doc);if(!all.some(x=>x.path===friendSelected))friendSelected=all[0]?.path||null;
+ try{const all=FriendStats.inspect(doc);if(!all.some(x=>x.path===friendSelected))friendSelected=all[0]?.path||null;
  for(const x of all)picker.append(option(x.path,x.name+' ('+x.ko+') · '+x.group+' ['+x.id+']'));
  picker.value=friendSelected||'';if(!friendSelected){$('friendInfo').textContent='이 세이브에는 합류·이탈 동료가 없습니다.';return;}
- try{const p=FriendStats.data(doc,friendSelected),values=friendDrafts.get(friendSelected)||friendPending.get(friendSelected)||FriendStats.fields(doc,friendSelected),who=all.find(x=>x.path===friendSelected);
+ const p=FriendStats.data(doc,friendSelected),values=friendDrafts.get(friendSelected)||friendPending.get(friendSelected)||FriendStats.fields(doc,friendSelected),who=all.find(x=>x.path===friendSelected);
  $('friendInfo').textContent='레벨 '+p._Lv+(who?.initLove!==null?' · 초기 호감도 '+who.initLove:'')+(who?.shixindan?' · 제5장 시심단 변수('+who.shixindan+')':'')+' · 포인트 직접 설정은 배운 특성을 유지합니다.';
  for(const [k,label] of FriendStats.definitions){const box=document.createElement('label'),input=document.createElement('input');box.textContent=label;input.id='friend'+k;input.type='number';input.min='0';input.max='1000000';input.step='1';input.value=values[k];input.disabled=busy;box.append(input);$('friendFields').append(box);}friendPreview();
- }catch(e){$('friendPreview').textContent=e.message;}
+ }catch(e){$('friendPreview').className='status error';$('friendPreview').textContent=e.message;}
 }
 function renderFriendLove(){
  const container=$('friendLoveFields');if(!container||!doc)return;container.replaceChildren();
@@ -267,7 +268,7 @@ function renderFriendLove(){
  }catch(e){if($('friendLovePreview')){$('friendLovePreview').className='status error';$('friendLovePreview').textContent=e.message;}}
 }
 function friendLoveInputs(){
- const out={};for(const x of FriendStats.inspectLove(doc)){if(!x.present)continue;const el=$('friendLove_'+x.id);if(el)out[x.id]=el.value;}return out;
+ const entries=FriendStats.inspectLove(doc),present=entries.filter(x=>x.present);if(present.length&&!$('friendLoveFields')?.children?.length)throw Error('동료 호감도 입력란이 준비되지 않았습니다.');const out={};for(const x of present){const el=$('friendLove_'+x.id);if(!el)throw Error('동료 호감도 입력란이 준비되지 않았습니다.');out[x.id]=el.value;}return out;
 }
 function previewFriendLove(){
  const preview=$('friendLovePreview');if(!preview||!doc)return;
@@ -280,15 +281,17 @@ function previewFriendLove(){
  }catch(e){preview.className='status error';preview.textContent=e.message;}
 }
 function queueFriendLove(){
- if(busy||!doc)return;friendLoveDraft=friendLoveInputs();
+ if(busy||!doc)return false;
  try{
+  friendLoveDraft=friendLoveInputs();
   const r=FriendStats.calculateLove(doc,friendLoveDraft);
   friendLoveValues=r.changes.size?{...friendLoveDraft}:null;
   invalidDrafts.delete('friendLove');revision++;pending();previewFriendLove();
   msg('동료 호감도(FriendLoveNum) 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');
- }catch(e){invalidDrafts.set('friendLove',e.message);pending();previewFriendLove();msg(e.message,true);}
+  return true;
+ }catch(e){invalidDrafts.set('friendLove',e.message);pending();previewFriendLove();msg(e.message,true);return false;}
 }
-function friendInputs(){return Object.fromEntries(FriendStats.definitions.map(([k])=>[k,$('friend'+k).value]));}
+function friendInputs(){FriendStats.fields(doc,friendSelected);if(!$('friendFields')?.children?.length)throw Error('동료 능력치 입력란이 준비되지 않았습니다.');return Object.fromEntries(FriendStats.definitions.map(([k])=>{const el=$('friend'+k);if(!el)throw Error('동료 능력치 입력란이 준비되지 않았습니다.');return [k,el.value];}));}
 function friendPreview(){try{
  const d=stagedEquipment(),p=FriendStats.data(d,friendSelected),r=FriendStats.calculate(d,friendSelected,friendInputs(),friendGearPaths(options).has(friendSelected)).linked;
  $('friendPreview').className='status';
@@ -296,10 +299,10 @@ function friendPreview(){try{
  }catch(e){$('friendPreview').className='status error';$('friendPreview').textContent='기혈 미리보기: '+e.message;}}
 
 $('friendPicker').onchange=()=>{friendSelected=$('friendPicker').value;renderFriends();};
-function queueFriend(){if(busy||!doc||!friendSelected)return;const key='friend:'+friendSelected,values=friendInputs();friendDrafts.set(friendSelected,values);try{const r=FriendStats.calculate(stagedEquipment(),friendSelected,values,friendGearPaths(options).has(friendSelected));if(r.changes.size)friendPending.set(friendSelected,{...values});else friendPending.delete(friendSelected);invalidDrafts.delete(key);revision++;pending();friendPreview();msg('동료 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');}catch(e){invalidDrafts.set(key,e.message);pending();friendPreview();msg(e.message,true);}}
+function queueFriend(){if(busy||!doc||!friendSelected)return;const key='friend:'+friendSelected;try{const values=friendInputs();friendDrafts.set(friendSelected,values);const r=FriendStats.calculate(stagedEquipment(),friendSelected,values,friendGearPaths(options).has(friendSelected));if(r.changes.size)friendPending.set(friendSelected,{...values});else friendPending.delete(friendSelected);invalidDrafts.delete(key);revision++;pending();friendPreview();msg('동료 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');}catch(e){invalidDrafts.set(key,e.message);pending();friendPreview();msg(e.message,true);}}
 function friendChanges(){
- if(!doc)return;const all=FriendStats.inspect(doc);
- for(const [path,values] of friendPending){const li=document.createElement('li'),button=document.createElement('button'),who=all.find(x=>x.path===path);li.textContent=who.name+' ('+who.group+') · '+FriendStats.definitions.map(([k,label])=>label+' '+values[k]).join(' / ');button.textContent='취소';button.onclick=()=>discardDraft('friend:'+path);li.append(button);$('changes').append(li);}
+ if(!doc||(!friendPending.size&&!friendLoveValues))return;
+ if(friendPending.size){const all=FriendStats.inspect(doc);for(const [path,values] of friendPending){const li=document.createElement('li'),button=document.createElement('button'),who=all.find(x=>x.path===path);li.textContent=(who?who.name+' ('+who.group+')':path)+' · '+FriendStats.definitions.map(([k,label])=>label+' '+values[k]).join(' / ');button.textContent='취소';button.onclick=()=>discardDraft('friend:'+path);li.append(button);$('changes').append(li);}}
  if(friendLoveValues){
   const entries=FriendStats.inspectLove(doc),summary=entries.filter(x=>x.present&&friendLoveValues[x.id]!==undefined&&friendLoveValues[x.id]!==x.value).map(x=>x.ko+' '+x.value+'→'+friendLoveValues[x.id]);
   if(summary.length){const li=document.createElement('li'),button=document.createElement('button');li.textContent='동료 호감도(FriendLoveNum) · '+summary.join(' / ');button.textContent='취소';button.onclick=()=>discardDraft('friendLove');li.append(button);$('changes').append(li);}
@@ -330,9 +333,9 @@ function renderPoints(){
   }previewPoints();
  }catch(e){$('pointsPreview').className='status error';$('pointsPreview').textContent=e.message;}
 }
-function pointInputs(){return Object.fromEntries(PlayerPoints.definitions.map(([k])=>[k,$('point'+k).value]));}
+function pointInputs(){PlayerPoints.fields(doc);if(!$('pointsFields')?.children?.length)throw Error('포인트 입력란이 준비되지 않았습니다.');return Object.fromEntries(PlayerPoints.definitions.map(([k])=>{const el=$('point'+k);if(!el)throw Error('포인트 입력란이 준비되지 않았습니다.');return [k,el.value];}));}
 function previewPoints(){try{const r=PlayerPoints.calculate(doc,pointInputs());$('pointsPreview').className='status';$('pointsPreview').textContent='특성 누적 추가분 '+r.values.TalentAdd+' / 능력치 추가분 '+r.values.AddProSpot+' / 생활 포인트 '+r.values.LifePoints+' / 의술 '+r.values.MedicineLevel+' · 단조 '+r.values.ForgeLevel+' · 해정 '+r.values.LockpickLevel;}catch(e){$('pointsPreview').className='status error';$('pointsPreview').textContent=e.message;}}
-function queuePoints(){if(busy||!doc)return;pointDraft=pointInputs();try{const r=PlayerPoints.calculate(doc,pointDraft);pointValues=r.changes.size?{...pointDraft}:null;invalidDrafts.delete('points');revision++;pending();previewPoints();msg('포인트 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');}catch(e){invalidDrafts.set('points',e.message);pending();previewPoints();msg(e.message,true);}}
+function queuePoints(){if(busy||!doc)return false;try{pointDraft=pointInputs();const r=PlayerPoints.calculate(doc,pointDraft);pointValues=r.changes.size?{...pointDraft}:null;invalidDrafts.delete('points');revision++;pending();previewPoints();msg('포인트 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');return true;}catch(e){invalidDrafts.set('points',e.message);pending();previewPoints();msg(e.message,true);return false;}}
 function pointChanges(){if(!pointValues)return;const li=document.createElement('li'),button=document.createElement('button');li.textContent='주인공 포인트 · '+PlayerPoints.definitions.map(([k,label])=>label+' '+pointValues[k]).join(' / ');button.textContent='취소';button.onclick=()=>discardDraft('points');li.append(button);$('changes').append(li);}
 
 function renderCategoryFilters(state){
@@ -360,7 +363,7 @@ const EDITOR_CODE_ATLAS=[
  ['herb-snow-lotus','화폐·필수 약재','천산설련 (天山雪莲 · 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 2 — 황우곡 단방 고소강에게 구매'],
  ['herb-aconite','화폐·필수 약재','오두 (乌头 · 황우곡 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 3 — 광림성 약방 해랍아에게 구매'],
  ['herb-ascension-dew','화폐·필수 약재','승천로 (承天露 · 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 4 — 용거성 시내 약방에서 구매'],
- ['mat-zhanghua','화폐·필수 약재','장화단 (3妆花缎 · 직금 비단 재료)','5 ~ 20개','복사본 추가 및 게임 재저장 보존이 확인된 3등급 직금(织锦) 제작 재료 (천년설삼 연수단과 한자 구분: 妆花缎)'],
+ ['mat-zhanghua','화폐·필수 약재','장화단 (3妆花缎 · 직금 비단 재료)','5 ~ 20개','방어구·의복 제작에 쓰이는 3등급 직금(织锦) 비단 재료 (단약 장화단과 한자 구분: 妆花缎)'],
  ['item-miasma-water','화폐·필수 약재','장기 제거수 (驱瘴水)','1 ~ 3개','안거성 동쪽 고분 독안개 돌파 및 수(寿) 영입 필수 영약'],
  ['gear-lingshuang','신병·핵심 장비','능상 (凌霜 · 전설 신병 검)','장비 등급 5~6 · 치명/빙결','서호지궁 도안 + 천산 자루 + 필보산장 코등이 + 임안교 검신 제작'],
  ['gear-guanggun','신병·핵심 장비','광곤 (一根老光棍 · 전설 신병 곤)','장비 등급 5~6 · 연격/제어','홍향산 연못·동굴·서쪽 성벽 동굴 3대 부품 + 영온 제작'],
@@ -434,51 +437,77 @@ document.addEventListener('click',e=>{
  const presetBtn=e.target.closest?.('[data-editor-preset]');
  if(presetBtn){
   const key=presetBtn.getAttribute('data-editor-preset');
-  if(!doc||busy){setPresetNote(window.nativeRequest?'먼저 상단 [게임 세이브 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.':'먼저 상단 [세이브 .es3 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.',true);return;}
-  if(STAT_PRESETS[key]){
-   const p=STAT_PRESETS[key];$('statsTab')?.click();
-   for(const [k,v] of Object.entries(p))if(k!=='label'&&$('stat'+k))$('stat'+k).value=v;
-   previewStats();queueStats(true);
-   setPresetNote('프리셋 적용 완료: '+p.label+' — 하단 저장/다운로드 버튼으로 반영하세요.');
-  }else if(key==='life-medicine'){
-   $('pointsTab')?.click();
-   const cur=PlayerPoints.fields(doc);
-   const nextVals={TalentAdd:String(Math.max(15,Number(cur.TalentAdd)+15)),AddProSpot:String(Math.max(20,Number(cur.AddProSpot))),LifePoints:'20',MedicineLevel:'45'};
-   for(const [k,v] of Object.entries(nextVals))if($('point'+k))$('point'+k).value=v;
-   queuePoints();
-   setPresetNote('프리셋 적용 완료: 의술 레벨 45 · 생활 포인트 20 · 특성 추가분 반영');
-  }else if(key==='life-all-master'){
-   $('pointsTab')?.click();
-   const cur=PlayerPoints.fields(doc);
-   const nextVals={TalentAdd:String(Math.max(30,Number(cur.TalentAdd))),AddProSpot:String(Math.max(50,Number(cur.AddProSpot))),LifePoints:'50'};
-   for(const [idx,k] of PlayerPoints.lifeSkills)if(doc.byPath.has('/savePlayerData/value/LifeExp/'+idx))nextVals[k]='60';
-   for(const [k,v] of Object.entries(nextVals))if($('point'+k))$('point'+k).value=v;
-   queuePoints();
-   setPresetNote('프리셋 적용 완료: 9대 생활 기술 레벨 60 · 생활 포인트 50 일괄 반영');
-  }else if(key==='friend-love-60'){
-   $('friendsTab')?.click();
-   const entries=FriendStats.inspectLove(doc).filter(x=>x.present);
-   if(!entries.length){setPresetNote('이 세이브에는 아직 기록된 동료 호감도(FriendLoveNum) 슬롯이 없습니다.',true);return;}
-   for(const x of entries){const el=$('friendLove_'+x.id);if(el)el.value=String(Math.max(60,Number(x.value)));}
-   queueFriendLove();
-   setPresetNote('프리셋 적용 완료: 기록된 동료 호감도 슬롯 '+entries.length+'개를 60 이상으로 일괄 반영');
-  }else if(key==='money-rich'){
-   const cash=Equipment.money(model);
-   if(!cash){setPresetNote('이 세이브에서 보유 동전 항목을 찾지 못했습니다.',true);return;}
-   $('moneyButton')?.click();
-   if($('quantity')){$('quantity').value='500000';$('stage')?.click();setPresetNote('프리셋 적용 완료: 보유 동전 500,000문 변경 대기 반영');}
+  if(busy)return;
+  if(!doc){setPresetNote(window.nativeRequest?'먼저 상단 [게임 세이브 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.':'먼저 상단 [세이브 .es3 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.',true);return;}
+  try {
+   if(STAT_PRESETS[key]){
+    const p=STAT_PRESETS[key];$('statsTab')?.click();
+    for(const [k,v] of Object.entries(p))if(k!=='label'&&$('statsFields')?.children?.length&&$('stat'+k))$('stat'+k).value=v;
+    previewStats();const ok=queueStats();
+    if(ok)setPresetNote('프리셋 적용 완료: '+p.label+' — 하단 저장/다운로드 버튼으로 반영하세요.');
+    else setPresetNote(invalidDrafts.get('stats')||'프리셋 적용 실패',true);
+   }else if(key==='life-medicine'||key==='life-all-master'){
+    $('pointsTab')?.click();
+    let ok=false;
+    try {
+     const orig=PlayerPoints.fields(doc),cur=(!invalidDrafts.has('points')&&pointDraft)||pointValues||orig;
+     const effPt=k=>{const raw=String(cur[k]??orig[k]);return /^(0|[1-9]\d*)$/.test(raw)?Number(raw):Number(orig[k]);};
+     const nextVals=key==='life-medicine'?{TalentAdd:String(Math.max(15,effPt('TalentAdd')+15)),AddProSpot:String(Math.max(20,effPt('AddProSpot'))),LifePoints:String(Math.max(20,effPt('LifePoints'))),MedicineLevel:String(Math.max(45,effPt('MedicineLevel')))}:{TalentAdd:String(Math.max(30,effPt('TalentAdd'))),AddProSpot:String(Math.max(50,effPt('AddProSpot'))),LifePoints:String(Math.max(50,effPt('LifePoints')))};
+     if(key==='life-all-master')for(const [idx,k] of PlayerPoints.lifeSkills)if(doc.byPath.has('/savePlayerData/value/LifeExp/'+idx))nextVals[k]=String(Math.max(60,effPt(k)));
+     if($('pointsFields')?.children?.length)for(const [k,v] of Object.entries(nextVals))if($('point'+k))$('point'+k).value=v;
+     ok=queuePoints();
+    } catch(err) {
+     invalidDrafts.set('points',err.message);
+     pending();
+     previewPoints();
+     msg(err.message,true);
+    }
+    if(ok)setPresetNote(key==='life-medicine'?'프리셋 적용 완료: 의술 레벨 45 · 생활 포인트 20 · 특성 추가분 반영':'프리셋 적용 완료: 9대 생활 기술 레벨 60 · 생활 포인트 50 일괄 반영');
+    else setPresetNote(invalidDrafts.get('points')||'프리셋 적용 실패',true);
+   }else if(key==='friend-love-60'){
+    $('friendsTab')?.click();
+    let ok=false,appliedCount=0;
+    try {
+     const entries=FriendStats.inspectLove(doc).filter(x=>x.present);
+     if(!entries.length){const emptyMsg='이 세이브에는 아직 기록된 동료 호감도(FriendLoveNum) 슬롯이 없습니다.';setPresetNote(emptyMsg,true);msg(emptyMsg,true);return;}
+     appliedCount=entries.length;
+     const curLove=(!invalidDrafts.has('friendLove')&&friendLoveDraft)||friendLoveValues||{};
+     if($('friendLoveFields')?.children?.length)for(const x of entries){const el=$('friendLove_'+x.id);if(el){const raw=String(curLove[x.id]??x.value),curVal=/^(0|[1-9]\d{0,3})$/.test(raw)&&Number(raw)<=1000?Number(raw):Number(x.value);el.value=String(Math.max(60,curVal));}}
+     ok=queueFriendLove();
+    } catch(err) {
+     invalidDrafts.set('friendLove',err.message);
+     pending();
+     previewFriendLove();
+     msg(err.message,true);
+    }
+    if(ok)setPresetNote('프리셋 적용 완료: 기록된 동료 호감도 슬롯 '+appliedCount+'개를 60 이상으로 일괄 반영');
+    else setPresetNote(invalidDrafts.get('friendLove')||'프리셋 적용 실패',true);
+   }else if(key==='money-rich'){
+    const cash=Equipment.money(model);
+    if(!cash){const noCash='이 세이브에서 보유 동전 항목을 찾지 못했습니다.';setPresetNote(noCash,true);msg(noCash,true);return;}
+    $('moneyButton')?.click();
+    if($('quantity')){$('quantity').value='500000';$('stage')?.click();if(!invalidDrafts.has('entry:'+cash.path))setPresetNote('프리셋 적용 완료: 보유 동전 500,000문 변경 대기 반영');else setPresetNote(invalidDrafts.get('entry:'+cash.path)||'프리셋 적용 실패',true);}
+   }
+  } catch(err) {
+   const errMsg=err?.message||'프리셋 적용 실패';
+   setPresetNote(errMsg,true);
+   msg(errMsg,true);
   }
   return;
  }
  const qBtn=e.target.closest?.('[data-editor-qsearch]');
  if(qBtn){
+  if(busy)return;
   const [targetTab,kw]=(qBtn.getAttribute('data-editor-qsearch')||'').split(':');
   if(targetTab==='add'){
+   if($('catalogState'))$('catalogState').value='all';
+   const cs=$('catalogSearch');if(cs)cs.value=kw||'';
    $('addTab')?.click();
-   const cs=$('catalogSearch');if(cs){cs.value=kw||'';cs.dispatchEvent?.(new Event('input',{bubbles:true}));cs.focus?.();}
+   cs?.focus?.();
   }else{
-   $(targetTab==='gears'?'gearsTab':'itemsTab')?.click();
-   const s=$('search');if(s){s.value=kw||'';if(typeof s.oninput==='function')s.oninput();s.focus?.();}
+   const which=targetTab==='gears'?'gears':'items';listStates[which]={...InventoryList.defaults()[which],sort:listStates[which]?.sort||'name-asc',size:listStates[which]?.size||50,query:kw||''};
+   $(which==='gears'?'gearsTab':'itemsTab')?.click();
+   $('search')?.focus?.();
   }
   setPresetNote('한글 빠른 검색 전환: ['+(kw||'')+'] 목록 필터링');
  }

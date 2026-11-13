@@ -1,4 +1,4 @@
-# 영수강호 세이브 편집기 v0.11
+# 영수강호 세이브 편집기 v0.11.1
 
 Beast Saga / 灵兽江湖의 `.es3` 세이브를 로컬에서 편집하는 Windows 도구입니다.
 **분류별 아이템 탐색·복사본 추가, 장비별 옵션 중첩 편집, 9대 생활 기술·23슬롯 호감도, 원클릭 회차 프리셋, 역공학 수식 사전과 다중어 검색**을 지원하는 Windows 릴리스입니다. 게임 실행 중 메모리를 바꾸는 트레이너가 아닙니다.
@@ -7,7 +7,7 @@ Beast Saga / 灵兽江湖의 `.es3` 세이브를 로컬에서 편집하는 Windo
 
 1. Windows 배포 ZIP의 압축을 새 폴더에 풉니다.
 2. 게임을 종료하고 세이브 폴더를 별도로 복사해 보관합니다.
-3. `BeastSagaEquipmentEditor-v0.11.exe`를 실행합니다.
+3. `BeastSagaEquipmentEditor-v0.11.1.exe`를 실행합니다.
 4. **게임 세이브 열기**로 별도 보관한 플레이 세이브 복사본을 선택합니다. Steam의 게임 관리 → 로컬 파일 보기로 설치 폴더를 열면 `SaveData`에서 슬롯을 찾을 수 있습니다. 설치 위치는 PC마다 다릅니다.
 5. 수정 후 변경 목록을 확인하고 **세이브 저장 · 자동 백업**을 누릅니다.
 6. 저장 완료 및 백업 경로를 확인하고 파일을 다시 열어 값을 확인합니다. 이후 게임에서 해당 슬롯을 불러옵니다.
@@ -165,7 +165,7 @@ python build.py --webview2 .\vendor\webview2
 node tests\money.cjs
 ```
 
-결과는 `dist/BeastSagaEquipmentEditor-v0.11.exe`와 `.html`입니다.
+결과는 `dist/BeastSagaEquipmentEditor-v0.11.1.exe`와 `.html`입니다.
 추가 저장 모듈 테스트는 새 임시 폴더에서 실행할 수 있습니다.
 
 ```powershell
