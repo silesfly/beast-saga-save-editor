@@ -12,7 +12,7 @@ args = parser.parse_args()
 sdk = args.webview2.resolve()
 src, out = ROOT / 'src', ROOT / 'dist'
 out.mkdir(exist_ok=True)
-version = '0.10'
+version = '0.11'
 html = (src / 'equipment-page.html').read_text(encoding='utf-8')
 modules = [('CORE', 'item-core'), ('CATALOG', 'catalog'), ('ADDCATALOG','add-catalog'), ('ADDITIONS','additions'), ('EQUIPMENT', 'equipment'),
            ('STATCATALOG', 'stat-catalog'), ('STATS', 'stats'), ('FRIENDS', 'friends'),

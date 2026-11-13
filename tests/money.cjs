@@ -64,6 +64,12 @@ test('9 life skills (LifeExp/0..8) and points round-trip with 4-key and 12-key i
  assert.equal(d12.byPath.get('/savePlayerData/value/LifeExp/8').raw,String(P.thresholds[59]));
  assert.throws(()=>P.apply(d,{...f0,ForgeLevel:'101'}));
  assert.throws(()=>P.apply(d,{...f0,LockpickLevel:'0'}));
+ assert.throws(()=>P.apply(d,{...f0,LifePoints:'1'}),/생활 기술 레벨을 11 이상/);
+ const outForge=Buffer.from(P.apply(d,{...f0,LifePoints:'1',MedicineLevel:'1',ForgeLevel:'11'}));
+ const dForge=C.parse(outForge),fForge=P.fields(dForge);
+ assert.equal(fForge.LifePoints,'1');assert.equal(fForge.MedicineLevel,'1');assert.equal(fForge.ForgeLevel,'11');
+ assert.equal(dForge.byPath.get('/savePlayerData/value/LifeExp/0').raw,String(P.thresholds[10]));
+ assert.equal(dForge.byPath.get('/savePlayerData/value/UseLifePeak').raw,'0');
 });
 test('23-slot FriendLoveTable metadata and FriendLoveNum byte-exact editing',()=>{
  assert.equal(F.loveTable.length,23);

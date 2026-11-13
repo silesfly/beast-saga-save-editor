@@ -62,7 +62,7 @@ const PlayerPoints=(()=>{
   const lifeChanged=lifeSkills.some(([,k])=>v[k]!==Number(old[k]));
   if(v.LifePoints!==Number(old.LifePoints)||lifeChanged){
    const earned=life(doc,v);
-   if(v.LifePoints>0&&earned===0)throw Error('생활 기술이 낮아 포인트가 0으로 고정됩니다. 의술 레벨을 11 이상으로 설정하세요.');
+   if(v.LifePoints>0&&earned===0)throw Error('생활 기술이 낮아 포인트가 0으로 고정됩니다. 의술·단조 등 생활 기술 레벨을 11 이상으로 설정하세요.');
    for(const [idx,k] of lifeSkills){
     if(v[k]!==Number(old[k])){
      if(!doc.byPath.has(root+'/LifeExp/'+idx))throw Error('생활 기술 기록이 없습니다: '+k);

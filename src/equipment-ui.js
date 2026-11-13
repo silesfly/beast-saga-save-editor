@@ -205,6 +205,7 @@ function installNative(){
  };
  $('export').textContent='세이브 저장 · 자동 백업';
  $('saveHelp').textContent='기존 값만 편집하면 자동 백업 후 같은 파일에 저장합니다. 아이템 추가·옵션 변경이 있으면 새 복사본으로 저장합니다. 게임을 종료하고 시험용 복사본을 여세요.';
+ if($('modeNotice'))$('modeNotice').textContent='주인공 능력치를 바꾸면 장비·내공·특성 보정을 반영해 기혈을 자동 계산합니다. 기존 값만 편집하면 자동 백업 후 같은 파일에 저장합니다. 아이템 추가·옵션 변경은 새 복사본으로 저장합니다.';
  msg('게임을 종료하고 실제 세이브 파일을 여세요. 저장하면 자동 백업 후 원래 파일에 적용합니다.');
 }
 if(window.chrome?.webview)installNative();
@@ -359,7 +360,7 @@ const EDITOR_CODE_ATLAS=[
  ['herb-snow-lotus','화폐·필수 약재','천산설련 (天山雪莲 · 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 2 — 황우곡 단방 고소강에게 구매'],
  ['herb-aconite','화폐·필수 약재','오두 (乌头 · 황우곡 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 3 — 광림성 약방 해랍아에게 구매'],
  ['herb-ascension-dew','화폐·필수 약재','승천로 (承天露 · 4대 약재)','1 ~ 3개','토천천 영입 필수 약재 4 — 용거성 시내 약방에서 구매'],
- ['pill-zhanghua','화폐·필수 약재','장화단 (3妆花缎) · 연수단','5 ~ 20개','게임 재저장 보존이 확인된 대표 회복·성장 재료 및 천년설삼 연수단'],
+ ['mat-zhanghua','화폐·필수 약재','장화단 (3妆花缎 · 직금 비단 재료)','5 ~ 20개','복사본 추가 및 게임 재저장 보존이 확인된 3등급 직금(织锦) 제작 재료 (천년설삼 연수단과 한자 구분: 妆花缎)'],
  ['item-miasma-water','화폐·필수 약재','장기 제거수 (驱瘴水)','1 ~ 3개','안거성 동쪽 고분 독안개 돌파 및 수(寿) 영입 필수 영약'],
  ['gear-lingshuang','신병·핵심 장비','능상 (凌霜 · 전설 신병 검)','장비 등급 5~6 · 치명/빙결','서호지궁 도안 + 천산 자루 + 필보산장 코등이 + 임안교 검신 제작'],
  ['gear-guanggun','신병·핵심 장비','광곤 (一根老光棍 · 전설 신병 곤)','장비 등급 5~6 · 연격/제어','홍향산 연못·동굴·서쪽 성벽 동굴 3대 부품 + 영온 제작'],
@@ -387,8 +388,13 @@ function renderCodeAtlas(){
  if(catSel.children.length<=1){
   for(const c of [...new Set(EDITOR_CODE_ATLAS.map(r=>r[1]))])catSel.append(option(c,c));
  }
- const q=String(searchEl.value||'').trim().toLocaleLowerCase('ko'),cat=catSel.value||'all';
- const rows=EDITOR_CODE_ATLAS.filter(r=>(cat==='all'||r[1]===cat)&&(!q||r.join(' ').toLocaleLowerCase('ko').includes(q)));
+ const cat=catSel.value||'all';
+ const qWords=String(searchEl.value||'').toLocaleLowerCase('ko').trim().split(/\s+/).filter(Boolean);
+ const rows=EDITOR_CODE_ATLAS.filter(r=>{
+  if(cat!=='all'&&r[1]!==cat)return false;
+  const hay=r.join(' ').toLocaleLowerCase('ko');
+  return qWords.every(w=>hay.includes(w));
+ });
  const table=document.createElement('table');
  const head=document.createElement('tr');
  for(const h of ['코드 / 분류','한글 명칭','권장 수치 · 공식','세이브 경로 · 인게임 판정 설명']){const td=document.createElement('td');td.textContent=h;head.append(td);}
@@ -399,10 +405,24 @@ function renderCodeAtlas(){
   table.append(tr);
  }
  body.replaceChildren(table);
+ const status=$('codeAtlasStatus');
+ if(status)status.textContent=(qWords.length>0||cat!=='all')?('조건 일치 '+rows.length+'개 / 전체 '+EDITOR_CODE_ATLAS.length+'개 항목 표시 중'):('전체 '+EDITOR_CODE_ATLAS.length+'개 항목 표시 중');
 }
 if($('codeAtlasSearch'))$('codeAtlasSearch').oninput=renderCodeAtlas;
 if($('codeAtlasCategory'))$('codeAtlasCategory').onchange=renderCodeAtlas;
+if($('codeAtlasReset'))$('codeAtlasReset').onclick=()=>{if($('codeAtlasSearch'))$('codeAtlasSearch').value='';if($('codeAtlasCategory'))$('codeAtlasCategory').value='all';renderCodeAtlas();};
 renderCodeAtlas();
+window.addEventListener?.('keydown',e=>{
+ if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey)return;
+ const ae=document.activeElement;
+ if(ae&&(/^(input|textarea|select)$/i.test(ae.tagName||'')||ae.isContentEditable))return;
+ const target=tab==='add'?$('catalogSearch'):(tab==='items'||tab==='gears'?$('search'):$('codeAtlasSearch'));
+ if(!target||target.disabled)return;
+ if(tab!=='add'&&tab!=='items'&&tab!=='gears'&&$('editorCodeAtlasBox'))$('editorCodeAtlasBox').open=true;
+ e.preventDefault?.();
+ target.focus?.();
+ target.select?.();
+});
 
 const STAT_PRESETS={
  'starter-comfort':{Lv:'15',Power:'60',Perception:'60',Agility:'60',PhysicalPower:'60',Channel:'60',BerathSkill:'60',WuXing:'25',label:'초회차 쾌적 시작 (6대 능력치 60 · 오성 25)'},
@@ -414,7 +434,7 @@ document.addEventListener('click',e=>{
  const presetBtn=e.target.closest?.('[data-editor-preset]');
  if(presetBtn){
   const key=presetBtn.getAttribute('data-editor-preset');
-  if(!doc||busy){setPresetNote('먼저 상단 [세이브 .es3 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.',true);return;}
+  if(!doc||busy){setPresetNote(window.nativeRequest?'먼저 상단 [게임 세이브 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.':'먼저 상단 [세이브 .es3 열기]로 세이브 파일을 연 뒤 프리셋을 눌러주세요.',true);return;}
   if(STAT_PRESETS[key]){
    const p=STAT_PRESETS[key];$('statsTab')?.click();
    for(const [k,v] of Object.entries(p))if(k!=='label'&&$('stat'+k))$('stat'+k).value=v;

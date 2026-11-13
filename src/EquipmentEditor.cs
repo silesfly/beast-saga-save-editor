@@ -17,8 +17,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Beast Saga Equipment Editor")]
 [assembly: AssemblyProduct("Beast Saga Equipment Editor")]
-[assembly: AssemblyVersion("0.10.0.0")]
-[assembly: AssemblyFileVersion("0.10.0.0")]
+[assembly: AssemblyVersion("0.11.0.0")]
+[assembly: AssemblyFileVersion("0.11.0.0")]
 
 internal static class Program {
     internal static string RuntimeFolder;
@@ -70,7 +70,7 @@ internal static class Program {
                 // A separate application-owned cache, never an existing browser profile.
                 string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BeastSagaEquipmentEditor");
                 NoLinks(root); Directory.CreateDirectory(root);
-                RuntimeFolder = Path.Combine(root, "runtime-0.10"); NoLinks(RuntimeFolder);
+                RuntimeFolder = Path.Combine(root, "runtime-0.11"); NoLinks(RuntimeFolder);
                 Directory.CreateDirectory(RuntimeFolder);
             }
             string loader = Path.Combine(RuntimeFolder, "WebView2Loader.dll");
@@ -100,7 +100,7 @@ internal sealed class EditorForm : Form {
     bool working,closingAllowed,firstNavigation=true,selfTestStarted,catalogVerified;
     string activePath,activeHash,session,lastBackup;
     public EditorForm(){
-        Text="영수강호 · 세이브 편집기 0.10 · 자동 백업 저장";
+        Text="영수강호 · 세이브 편집기 0.11 · 자동 백업 저장";
         ClientSize=new Size(1280,900);MinimumSize=new Size(900,650);StartPosition=FormStartPosition.CenterScreen;
         web.Dock=DockStyle.Fill;Controls.Add(web);
         if(Program.TestRoot!=null){ShowInTaskbar=false;WindowState=FormWindowState.Minimized;}
@@ -149,11 +149,35 @@ internal sealed class EditorForm : Form {
         BeginInvoke(new Action(()=>HandleRequest(raw)));
     }
     void Reply(string id,Dictionary<string,object> result){result["id"]=id;web.CoreWebView2.PostWebMessageAsJson(Program.Json.Serialize(result));}
-    static void VerifyHash(string path,string expected){
+    static string FileHash(string path){
         using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.Read))using(var sha=SHA256.Create()){
-            string actual=BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
-            if(actual!=expected)throw new IOException("지원 데이터 해시가 아닙니다. 새 기능은 차단합니다: "+Path.GetFileName(path));
+            return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
         }
+    }
+    static readonly string[][] VerifiedInstallHashes=new string[][]{
+        new string[]{"f5af82247975feb6ab3c10571909f986ac262a425b683b711eafee55207faa64","4033614ff4167bd989a8e839f03e057da2e160e6241300ead6cee4199024cea5","a6d749b8f53c52975cdcca0f917a0734f92de32f3b12734105a1bbdcb8b7b0bf"},
+        new string[]{"39031b8c9daf1a8401659833845a9f0b2a88c1defda5dc473dc3ca49cefd0479","143e48c0203fd7a4c1b3f1ec61712740ace250f65f3576b2d19a495d3b3cd55e","6f771bfe97ced40e0f487713779697b904c42191eed625d5815a211021280283"},
+        new string[]{"9083bdf200a105f361185038067286d4a655e22b072ca9f16d4dd797693b22fe","32347c9e54830ee01f5175b1dcce500e376e075b78caf0a505b7178ce3fc859c","a6d749b8f53c52975cdcca0f917a0734f92de32f3b12734105a1bbdcb8b7b0bf"},
+        new string[]{"23a973baa73b2ce0eab7bc3f045a72fe90443c57d1a9613162cdcb4d7db2aa28","39b86ee2406d0b29a5215266ee4f28e56b5c284daacfd74504c19130a5f2ccdf","6f771bfe97ced40e0f487713779697b904c42191eed625d5815a211021280283"}
+    };
+    static void VerifyInstallHashes(string assetPath,string gameAssemblyPath,string metadataPath){
+        string assets=FileHash(assetPath);string ga=FileHash(gameAssemblyPath);string meta=FileHash(metadataPath);
+        bool assetKnown=false;bool gaKnown=false;bool metaKnown=false;
+        for(int i=0;i<VerifiedInstallHashes.Length;i++){
+            string[] set=VerifiedInstallHashes[i];
+            if(set[0]==assets)assetKnown=true;
+            if(set[1]==ga)gaKnown=true;
+            if(set[2]==meta)metaKnown=true;
+            if(set[0]==assets&&set[1]==ga&&set[2]==meta)return;
+        }
+        if(!assetKnown||!gaKnown||!metaKnown){
+            var bad=new List<string>();
+            if(!assetKnown)bad.Add(Path.GetFileName(assetPath));
+            if(!gaKnown)bad.Add(Path.GetFileName(gameAssemblyPath));
+            if(!metaKnown)bad.Add(Path.GetFileName(metadataPath));
+            throw new IOException("지원 데이터 해시가 아닙니다. 새 기능은 차단합니다: "+string.Join(", ",bad.ToArray()));
+        }
+        throw new IOException("지원 데이터 해시가 아닙니다. 새 기능은 차단합니다: 빌드 파일 조합 불일치 (sharedassets0.assets, GameAssembly.dll, global-metadata.dat)");
     }
     static string Get(Dictionary<string,object> d,string key){object v;if(!d.TryGetValue(key,out v)||!(v is string))throw new IOException("잘못된 요청: "+key);return (string)v;}
     void HandleRequest(string raw){
@@ -171,9 +195,7 @@ internal sealed class EditorForm : Form {
                     if(dialog.ShowDialog(this)!=DialogResult.OK){Reply(id,new Dictionary<string,object>{{"ok",true},{"cancelled",true}});return;}asset=dialog.FileName;
                 }
                 string folder=Path.GetDirectoryName(Path.GetFullPath(asset));
-                VerifyHash(asset,"f5af82247975feb6ab3c10571909f986ac262a425b683b711eafee55207faa64");
-                VerifyHash(Path.Combine(Path.GetDirectoryName(folder),"GameAssembly.dll"),"4033614ff4167bd989a8e839f03e057da2e160e6241300ead6cee4199024cea5");
-                VerifyHash(Path.Combine(folder,@"il2cpp_data\Metadata\global-metadata.dat"),"a6d749b8f53c52975cdcca0f917a0734f92de32f3b12734105a1bbdcb8b7b0bf");
+                VerifyInstallHashes(asset,Path.Combine(Path.GetDirectoryName(folder),"GameAssembly.dll"),Path.Combine(folder,@"il2cpp_data\Metadata\global-metadata.dat"));
                 catalogVerified=true;Reply(id,new Dictionary<string,object>{{"ok",true},{"verified",true}});
             }else if(kind=="open"&&p.Count==2){
                 string path;
@@ -230,6 +252,7 @@ internal sealed class EditorForm : Form {
             await web.CoreWebView2.ExecuteScriptAsync("$('verifyCatalog').click()");
             await Until("catalogVerified && !busy");
             await web.CoreWebView2.ExecuteScriptAsync(@"
+              if(!$('modeNotice').textContent.includes('같은 파일에 저장합니다'))throw Error('네이티브 안내 문구 누락');
               window.inputTest=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('input',{bubbles:true}));};
               $('moneyButton').click();if(!Equipment.isMoney(selected))throw Error('돈 경로 오류');inputTest('quantity','999998');if($('export').disabled)throw Error('정상 금액 저장 비활성');inputTest('quantity','');if(!$('export').disabled||!invalidDrafts.has('entry:'+selected.path))throw Error('잘못된 금액 허용');inputTest('quantity','1000000');$('pointsTab').click();$('moneyButton').click();if($('quantity').value!=='1000000')throw Error('돈 입력 손실');
               $('itemsTab').click();changeList('query','');changeList('sort','category-asc');changeList('category','2');changeList('subcategory','织锦');
@@ -239,21 +262,28 @@ internal sealed class EditorForm : Form {
               if(seen.length!==model.items.length||new Set(seen).size!==model.items.length)throw Error('페이지 항목 누락 또는 중복');
               changeList('sort','original');changeList('page',6);$('list').children[0].click();window.pagedPath=selected.path;window.pagedCount=String(Number(selected.count)+1);inputTest('quantity',pagedCount);changeList('category','2');changeList('category','all');
               changeList('page',1);changeList('page',6);$('list').children[0].click();if($('quantity').value!==pagedCount)throw Error('페이지 이동 중 입력 손실');
-              $('pointsTab').click();inputTest('pointTalentAdd','123');inputTest('pointAddProSpot','1500');inputTest('pointLifePoints','999');inputTest('pointMedicineLevel','50');$('statsTab').click();
+              $('pointsTab').click();inputTest('pointTalentAdd','123');inputTest('pointAddProSpot','1500');inputTest('pointLifePoints','999');inputTest('pointMedicineLevel','50');inputTest('pointForgeLevel','15');$('statsTab').click();
               inputTest('statPhysicalPower','500');inputTest('statLv','40');
               $('friendsTab').click();inputTest('friendPhysicalPower','500');inputTest('friendremainingPro','999');inputTest('friendremainingTalent','88');
               $('friendPicker').value='/saveFriendData/value/LeaveFriends/Ashou';$('friendPicker').dispatchEvent(new Event('change',{bubbles:true}));inputTest('friendPower','99');
               $('itemsTab').click();const cloth=model.items.find(x=>x.name==='3妆花缎');choose(cloth);inputTest('quantity','9999');
               const ring=model.gearByPath.get('/savePlayerData/value/PlayerDressEquip/6');tab='gears';choose(ring);
-              $('effect0').value='抗毒增加';$('effect0').dispatchEvent(new Event('change',{bubbles:true}));$('export').click();
+              $('effect0').value='抗毒增加';$('effect0').dispatchEvent(new Event('change',{bubbles:true}));
+              if(FriendStats.inspectLove(doc).length!==23)throw Error('호감도 23슬롯 오류');
+              $('codeAtlasSearch').value='의술 해금';$('codeAtlasSearch').oninput();
+              if(!($('editorCodeAtlasBody').querySelectorAll('tr').length-1>=1&&$('editorCodeAtlasBody').querySelectorAll('tr').length-1<38))throw Error('코드 사전 다중 검색 오류');
+              $('codeAtlasReset').click();
+              if($('editorCodeAtlasBody').querySelectorAll('tr').length!==39)throw Error('코드 사전 초기화 오류');
+              $('export').click();
             ");
             await Until("!busy && pendingSize()===0 && (/^(세이브|복사본) 저장 완료/).test($('status').textContent)");
             await Until("doc.byPath.get('/savePlayerData/value/PhysicalPower').raw==='500' && doc.byPath.get('/savePlayerData/value/SixProCurrent/4').raw==='500' && Number(doc.byPath.get('/savePlayerData/value/_MaxHp').raw)>15000");
             await Until("doc.byPath.get('/saveFriendData/value/AddFriends/luxi/_PhysicalPower').raw==='500' && doc.byPath.get('/saveFriendData/value/LeaveFriends/Ashou/_Power').raw==='99' && friendPending.size===0");
             await web.CoreWebView2.ExecuteScriptAsync("$('pointsTab').click()");
-            await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50'");
+            await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50' && $('pointForgeLevel').value==='15'");
             await Until("Equipment.inspect(doc).itemByPath.get(pagedPath).count===pagedCount");
             await Until("Equipment.money(model).count==='1000000'");
+            await Until("FriendStats.inspectLove(doc).length===23");
             slot=activePath;byte[] first=SaveStore.Read(slot);
             if(lastBackup==null||SaveStore.Hash(SaveStore.Read(lastBackup))!=SaveStore.Hash(original))throw new IOException("백업 불일치");
             await web.CoreWebView2.ExecuteScriptAsync(@"tab='items';choose(model.items.find(x=>x.name==='3妆花缎'));inputTest('quantity','10000');$('export').click();");
@@ -262,7 +292,7 @@ internal sealed class EditorForm : Form {
             await web.CoreWebView2.ExecuteScriptAsync("$('nativeOpen').click()");
             await Until("!busy && model!==null");
             await web.CoreWebView2.ExecuteScriptAsync("$('pointsTab').click()");
-            await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50' && Equipment.money(model).count==='1000000' && !hasEdits()");
+            await Until("$('pointTalentAdd').value==='123' && $('pointLifePoints').value==='999' && $('pointMedicineLevel').value==='50' && $('pointForgeLevel').value==='15' && Equipment.money(model).count==='1000000' && !hasEdits()");
             await web.CoreWebView2.ExecuteScriptAsync("$('moneyButton').click();inputTest('quantity','0');$('export').click()");
             await Until("!busy && !hasEdits() && Equipment.money(model).count==='0'");
             await web.CoreWebView2.ExecuteScriptAsync("$('nativeOpen').click()");
