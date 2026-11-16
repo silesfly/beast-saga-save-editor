@@ -248,6 +248,6 @@ function testUiFeatures(){
   assert.equal(vm.runInContext(`SaveCore.parse(PlayerStats.applyMeta(doc,metaValues)).byPath.get('/savePlayerData/value/_Round').raw`, ctx), '5');
   vm.runInContext(`discardDraft('meta');`, ctx);
   assert.equal(vm.runInContext(`metaValues===null && metaDraft===null && pendingSize()===0`, ctx), true);
- console.log('PASS v0.11.1 UI code atlas, modeNotice, presets, shortcuts, and REA metadata');
+ console.log('PASS v0.11.2 UI code atlas, modeNotice, presets, shortcuts, and REA metadata');
 }
 (async()=>{await preservePending(true);await preservePending(false);testUiFeatures();})().catch(e=>{console.error(e);process.exitCode=1});

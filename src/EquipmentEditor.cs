@@ -17,8 +17,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Beast Saga Equipment Editor")]
 [assembly: AssemblyProduct("Beast Saga Equipment Editor")]
-[assembly: AssemblyVersion("0.11.1.0")]
-[assembly: AssemblyFileVersion("0.11.1.0")]
+[assembly: AssemblyVersion("0.11.2.0")]
+[assembly: AssemblyFileVersion("0.11.2.0")]
 
 internal static class Program {
     internal static string RuntimeFolder;
@@ -70,7 +70,7 @@ internal static class Program {
                 // A separate application-owned cache, never an existing browser profile.
                 string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BeastSagaEquipmentEditor");
                 NoLinks(root); Directory.CreateDirectory(root);
-                RuntimeFolder = Path.Combine(root, "runtime-0.11.1"); NoLinks(RuntimeFolder);
+                RuntimeFolder = Path.Combine(root, "runtime-0.11.2"); NoLinks(RuntimeFolder);
                 Directory.CreateDirectory(RuntimeFolder);
             }
             string loader = Path.Combine(RuntimeFolder, "WebView2Loader.dll");
@@ -100,7 +100,7 @@ internal sealed class EditorForm : Form {
     bool working,closingAllowed,firstNavigation=true,initialLoaded,selfTestStarted,catalogVerified;
     string activePath,activeHash,session,lastBackup;
     public EditorForm(){
-        Text="영수강호 · 세이브 편집기 0.11.1 · 자동 백업 저장";
+        Text="영수강호 · 세이브 편집기 0.11.2 · 자동 백업 저장";
         ClientSize=new Size(1280,900);MinimumSize=new Size(900,650);StartPosition=FormStartPosition.CenterScreen;
         web.Dock=DockStyle.Fill;Controls.Add(web);
         if(Program.TestRoot!=null){ShowInTaskbar=false;WindowState=FormWindowState.Minimized;}
