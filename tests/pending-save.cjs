@@ -62,21 +62,28 @@ function testUiFeatures(){
  element('codeAtlasCategory').value='all';
  const ctx=vm.createContext({document,window:windowObj,TextEncoder,TextDecoder,Uint8Array,Map,Set,File,Blob,btoa,atob,console,URL,setTimeout,confirm:()=>true});
  for(const name of ['item-core','catalog','add-catalog','additions','equipment','categories','inventory-list','stat-catalog','stats','friends','points','equipment-ui','add-ui'])vm.runInContext(fs.readFileSync(path.join(repo,'src',name+'.js'),'utf8'),ctx);
- assert.equal(vm.runInContext('EDITOR_CODE_ATLAS.length',ctx),38);
+ assert.equal(vm.runInContext('EDITOR_CODE_ATLAS.length',ctx),45);
  const zhanghua=vm.runInContext('EDITOR_CODE_ATLAS.find(r=>r[0]==="mat-zhanghua")',ctx);
  assert.ok(zhanghua&&zhanghua.join(' ').includes('3妆花缎')&&zhanghua.join(' ').includes('직금'));
  assert.ok(!zhanghua.join(' ').includes('재저장 보존'));
- assert.equal(element('codeAtlasStatus').textContent,'전체 38개 항목 표시 중');
- assert.equal(element('editorCodeAtlasBody').children[0].children.length,39);
+ for(const [id,needle] of [['AttackBaoJI','0x18158f8f0'],['AttackEnemyShanBi','20.0'],['AttackEnemyShanBi','[rax+0x28c]'],['PlayerArmorGasCalculate','0x1813cec10'],['EquipSkillCalculate','EquipDataSet::SkillCalculate'],['FriendLoveExc','0x1813bfa50'],['PlayerDataChong','ChongHad'],['PlayerDataMeta','_Round']]){
+  const entry=vm.runInContext(`EDITOR_CODE_ATLAS.find(r=>r[0]===${JSON.stringify(id)})`,ctx);
+  assert.ok(entry&&entry.join(' ').includes(needle),`missing REA atlas ${id}: ${needle}`);
+ }
+ assert.equal(element('codeAtlasStatus').textContent,'전체 45개 항목 표시 중');
+ assert.equal(element('editorCodeAtlasBody').children[0].children.length,46);
  element('codeAtlasSearch').value='황우곡 오두';
  element('codeAtlasSearch').oninput();
  assert.equal(element('editorCodeAtlasBody').children[0].children.length,3);
- assert.equal(element('codeAtlasStatus').textContent,'조건 일치 2개 / 전체 38개 항목 표시 중');
+ assert.equal(element('codeAtlasStatus').textContent,'조건 일치 2개 / 전체 45개 항목 표시 중');
+ element('codeAtlasSearch').value='회피 20.0';
+ element('codeAtlasSearch').oninput();
+ assert.equal(element('editorCodeAtlasBody').children[0].children.length,2);
  element('codeAtlasReset').onclick();
  assert.equal(element('codeAtlasSearch').value,'');
  assert.equal(element('codeAtlasCategory').value,'all');
- assert.equal(element('editorCodeAtlasBody').children[0].children.length,39);
- assert.equal(element('codeAtlasStatus').textContent,'전체 38개 항목 표시 중');
+ assert.equal(element('editorCodeAtlasBody').children[0].children.length,46);
+ assert.equal(element('codeAtlasStatus').textContent,'전체 45개 항목 표시 중');
  assert.ok((winListeners.keydown||[]).length>0);
  document.activeElement={tagName:'BODY'};
  vm.runInContext("tab='stats'",ctx);
@@ -216,6 +223,31 @@ function testUiFeatures(){
   vm.runInContext(`discardDraft('stats');discardDraft('points');discardDraft('friendLove');discardDraft('friend:/saveFriendData/value/AddFriends/bad');`, ctx);
   assert.equal(vm.runInContext(`invalidDrafts.size`, ctx), 0);
   assert.equal(element('export').disabled, false);
- console.log('PASS v0.11.1 UI code atlas, modeNotice, presets, and shortcuts');
+
+  vm.runInContext(`setSave({Lv:10,Power:20,Perception:20,Agility:20,PhysicalPower:20,Channel:20,BerathSkill:20,WuXing:15,SixProCurrent:{1:20,2:20,3:20,4:20,5:20,6:20},_BaseHp:658,_MaxHp:658,_Hp:658,DressInKangFu:null,DressBigLoop:{},DressSmallLoop:{},PlayerDressEquip:{},CharacterHad:{},LifeTypeHadPerk:{0:[],2:[]},FoodItem:{},FoodItemExtra:{},SkillTimeHad:{},TalentAdd:5,AddProSpot:10,UseLifePeak:0,LifeExp:{0:0,1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0}});tab='stats';render();`, ctx);
+  assert.equal(element('statsMetaFields').children.length, 0);
+  assert.ok(element('statsMetaSummary').textContent.includes('회차(_Round): 미기록'));
+  assert.equal(vm.runInContext(`queueMeta()===true && metaValues===null && pendingSize()===0`, ctx), true);
+
+  vm.runInContext(`setSave({Lv:10,Power:20,Perception:20,Agility:20,PhysicalPower:20,Channel:20,BerathSkill:20,WuXing:15,SixProCurrent:{1:20,2:20,3:20,4:20,5:20,6:20},_BaseHp:658,_MaxHp:658,_Hp:658,_Round:2,_DifficultyType:1,_Dlc:1,ChongHad:[{_Name:'金蚕'},{_Name:'冰蚕'}],ChongPotHad:[{}],DressChong:{_Name:'金蚕'},Fish:{'鲤鱼':3},Gamble:{'骰子':2},DressInKangFu:null,DressBigLoop:{},DressSmallLoop:{},PlayerDressEquip:{},CharacterHad:{},LifeTypeHadPerk:{0:[],2:[]},FoodItem:{},FoodItemExtra:{},SkillTimeHad:{},TalentAdd:5,AddProSpot:10,UseLifePeak:0,LifeExp:{0:0,1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0}});tab='stats';render();`, ctx);
+  assert.equal(element('statsMetaFields').children.length, 1);
+  assert.equal(element('meta_Round').value, '2');
+  assert.ok(element('statsMetaSummary').textContent.includes('영충(ChongHad): 2마리'));
+  assert.ok(element('statsMetaSummary').textContent.includes('장착 영충(DressChong): 金蚕'));
+  assert.ok(element('statsMetaSummary').textContent.includes('낚시(Fish): 1종'));
+  assert.ok(element('statsMetaSummary').textContent.includes('도박(Gamble): 1종'));
+  assert.ok(element('statsMetaSummary').textContent.includes('DLC(_Dlc): 1'));
+  element('meta_Round').value = '1000';
+  assert.equal(vm.runInContext(`queueMeta()`, ctx), false);
+  assert.equal(vm.runInContext(`invalidDrafts.has('meta')`, ctx), true);
+  assert.equal(element('export').disabled, true);
+  element('meta_Round').value = '5';
+  assert.equal(vm.runInContext(`queueMeta()`, ctx), true);
+  assert.equal(vm.runInContext(`!invalidDrafts.has('meta') && metaValues._Round==='5' && pendingSize()===1`, ctx), true);
+  assert.equal(element('export').disabled, false);
+  assert.equal(vm.runInContext(`SaveCore.parse(PlayerStats.applyMeta(doc,metaValues)).byPath.get('/savePlayerData/value/_Round').raw`, ctx), '5');
+  vm.runInContext(`discardDraft('meta');`, ctx);
+  assert.equal(vm.runInContext(`metaValues===null && metaDraft===null && pendingSize()===0`, ctx), true);
+ console.log('PASS v0.11.1 UI code atlas, modeNotice, presets, shortcuts, and REA metadata');
 }
 (async()=>{await preservePending(true);await preservePending(false);testUiFeatures();})().catch(e=>{console.error(e);process.exitCode=1});

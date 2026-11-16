@@ -127,6 +127,38 @@ test('23-slot FriendLoveTable metadata and FriendLoveNum byte-exact editing',()=
  assert.throws(()=>F.inspectLove({...d,byPath:new Map(d.byPath).set('/savePlayerData/value/FriendLoveNum','bad')}));
  assert.throws(()=>F.inspectLove({...d,byPath:new Map(d.byPath).set('/savePlayerData/value/FriendLoveNum/鹿柒','bad')}));
 });
+test('PlayerStats REA metadata inspection and byte-exact _Round editing',()=>{
+ const baseDoc=C.parse(synthetic);
+ const baseMeta=S.inspectMeta(baseDoc);
+ assert.equal(baseMeta.round.present,false);assert.equal(baseMeta.sixPro.present,false);assert.equal(baseMeta.chongHad.present,false);
+ assert.deepEqual({...S.metaFields(baseDoc)},{});
+ assert.deepEqual(Buffer.from(S.applyMeta(baseDoc,{})),synthetic);
+ assert.throws(()=>S.applyMeta(baseDoc,{_Round:'1'}),/필드가 이 세이브에 없습니다/);
+ const reaFixture=Buffer.from(JSON.stringify({
+  savePlayerData:{__type:'PlayerData, Assembly-CSharp',value:{
+   Power:20,Perception:21,Agility:22,PhysicalPower:23,Channel:24,BerathSkill:25,
+   SixProCurrent:{1:20,2:21,3:22,4:23,5:24,6:25},
+   _Round:1,_DifficultyType:2,_Dlc:1,
+   ChongHad:[{_Name:'金蚕'},{_Name:'冰蚕'}],ChongPotHad:[{}],DressChong:{_Name:'金蚕'},
+   Fish:{'鲤鱼':3},Gamble:{'骰子':2},
+   ItemHad:{'铜钱':{_Name:'铜钱',_Count:50}}
+  }},
+  saveInfoData:{value:{}},
+  tail:'keep-exact',
+  extra:[1,2,3]
+ },null,2));
+ const d=C.parse(reaFixture),m=S.inspectMeta(d);
+ assert.equal(m.round.present,true);assert.equal(m.round.value,1);
+ assert.equal(m.difficulty.raw,'2');assert.equal(m.dlc.value,1);
+ assert.equal(m.sixPro.present,true);assert.equal(m.sixPro.synced,true);assert.deepEqual(Array.from(m.sixPro.values),[20,21,22,23,24,25]);
+ assert.equal(m.chongHad.count,2);assert.equal(m.chongPotHad.count,1);assert.equal(m.dressChong.equipped,true);assert.equal(m.dressChong.name,'金蚕');
+ assert.equal(m.fish.count,1);assert.equal(m.gamble.count,1);
+ assert.deepEqual(Buffer.from(S.applyMeta(d,S.metaFields(d))),reaFixture);
+ const out=Buffer.from(S.applyMeta(d,{_Round:'4'}));
+ assert.equal(C.parse(out).byPath.get('/savePlayerData/value/_Round').raw,'4');
+ assert.deepEqual(out,spliceExpected(reaFixture,d,[['/savePlayerData/value/_Round','4']]));
+ for(const bad of ['-1','1000','1.5','01','abc'])assert.throws(()=>S.applyMeta(d,{_Round:bad}));
+});
 if(process.argv[2]){
  const bytes=fs.readFileSync(process.argv[2]),d=C.parse(bytes),m=E.inspect(d);
  test('private save money-only patch preserves every other byte',()=>{

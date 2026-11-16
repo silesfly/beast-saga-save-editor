@@ -2,13 +2,13 @@
 const $=id=>document.getElementById(id);
 let listStates=InventoryList.defaults(),listResult=null;
 let pointValues=null,pointDraft=null;
-let statValues=null,statDraft=null,statsReady=false;
+let statValues=null,statDraft=null,statsReady=false,metaValues=null,metaDraft=null;
 let friendPending=new Map(),friendDrafts=new Map(),friendLoveValues=null,friendLoveDraft=null,friendSelected=null,countDrafts=new Map(),optionDrafts=new Map(),invalidDrafts=new Map();
 const newAdds=new Map();let catalogVerified=false;
 const hasEdits=()=>pendingSize()>0||invalidDrafts.size>0;
-function resetDrafts(){newAdds.clear();pointValues=null;pointDraft=null;statDraft=null;friendPending.clear();friendDrafts.clear();friendLoveValues=null;friendLoveDraft=null;countDrafts.clear();optionDrafts.clear();invalidDrafts.clear();}
+function resetDrafts(){newAdds.clear();pointValues=null;pointDraft=null;statDraft=null;metaValues=null;metaDraft=null;friendPending.clear();friendDrafts.clear();friendLoveValues=null;friendLoveDraft=null;countDrafts.clear();optionDrafts.clear();invalidDrafts.clear();}
 
-const pendingSize=()=>newAdds.size+counts.size+options.size+(statValues?1:0)+friendPending.size+(friendLoveValues?1:0)+(pointValues?1:0);
+const pendingSize=()=>newAdds.size+counts.size+options.size+(statValues?1:0)+(metaValues?1:0)+friendPending.size+(friendLoveValues?1:0)+(pointValues?1:0);
 let optionScope='affixes',nativeSession=null;
 let doc=null,model=null,file=null,counts=new Map(),options=new Map(),selected=null,tab='stats',generation=0,revision=0,busy=false;
 function msg(text,error=false){$('status').textContent=text;$('status').className=error?'status error':'status';}
@@ -20,7 +20,7 @@ function sync(){
  $('moneyButton').textContent=cash?'돈 · 동전 수정 ('+Number(counts.get(cash.path)??cash.count).toLocaleString()+')':'돈 · 동전 수정';
  $('backup').disabled=!doc||busy; $('file').disabled=busy; if($('nativeOpen'))$('nativeOpen').disabled=busy; $('export').disabled=!doc||busy||pendingSize()===0||invalidDrafts.size>0;
  $('clear').disabled=busy||!hasEdits();$('stage').disabled=!selected||busy||tab==='gears'&&!!Equipment.editable(selected);
- for(const el of document.querySelectorAll('#fields input,#fields select,#statsFields input,#friendFields input,#friendLoveFields input,#friendPicker,#pointsFields input'))el.disabled=busy||el.dataset.locked==='true';
+ for(const el of document.querySelectorAll('#fields input,#fields select,#statsFields input,#statsMetaFields input,#friendFields input,#friendLoveFields input,#friendPicker,#pointsFields input'))el.disabled=busy||el.dataset.locked==='true';
  for(const el of document.querySelectorAll('#editorQuickHelper button'))el.disabled=busy;
  $('stageStats').disabled=!doc||busy||!statsReady;
  syncListControls();
@@ -113,7 +113,7 @@ function pending(){
  if(statValues){const li=document.createElement('li'),remove=document.createElement('button');li.textContent='주인공 능력치 · '+PlayerStats.definitions.map(([k,label])=>label+' '+statValues[k]).join(' / ')+' · 기혈 자동 계산';remove.textContent='취소';remove.onclick=()=>{if(busy)return;statValues=null;statDraft=null;invalidDrafts.delete('stats');revision++;pending();render();};li.append(remove);$('changes').append(li);}
  const linked=!!statValues||[...options.keys()].some(p=>p.startsWith(PlayerStats.root+'/PlayerDressEquip/'));
  if(linked&&doc){const li=document.createElement('li');try{const d=SaveCore.parse(Equipment.apply(doc,counts,options)),r=PlayerStats.calculate(d,statValues||PlayerStats.fields(d));li.textContent='기혈 자동 연계: 최대 '+fmt(r.oldMax)+' → '+fmt(r.max)+' / 현재 '+fmt(r.oldHp)+' → '+fmt(r.hp);}catch(e){li.textContent=e.message;li.className='error';}$('changes').append(li);}
- pointChanges();friendChanges();invalidChanges();sync();
+ pointChanges();metaChanges();friendChanges();invalidChanges();sync();
 }
 function describe(type,x,value){return type==='items'?x.label+' : '+x.count+' → '+value+'개':x.label+' ('+x.owner+') : '+x.effects.map(Equipment.effectLabel).join(' / ')+' → '+Equipment.validateChoice(x,value).map(Equipment.effectLabel).join(' / ');}
 $('file').onchange=e=>{const f=e.target.files[0];e.target.value='';loadFile(f);};
@@ -156,7 +156,7 @@ $('clear').onclick=()=>{if(!busy&&confirm('대기 변경을 모두 취소할까�
 $('backup').onclick=()=>{if(doc&&!busy)dl(doc.bytes,filename()+'.ORIGINAL-BACKUP.es3');};
 $('export').onclick=async()=>{
  if(!doc||busy||pendingSize()===0||invalidDrafts.size)return;
- busy=true;sync();const gen=generation,rev=revision,source=doc,f=file,oldCounts=new Map(counts),oldOptions=new Map([...options].map(([k,v])=>[k,[...v]])),oldAdds=new Map(newAdds),oldTrial=$('addTrial').checked,name=filename();
+ busy=true;sync();const gen=generation,rev=revision,source=doc,f=file,oldCounts=new Map(counts),oldOptions=new Map([...options].map(([k,v])=>[k,[...v]])),oldAdds=new Map(newAdds),oldMeta=metaValues?{...metaValues}:null,oldTrial=$('addTrial').checked,name=filename();
  try{
   const current=new Uint8Array(await f.arrayBuffer());
   if(gen!==generation||rev!==revision)throw Error('파일 또는 변경 목록이 바뀌어 내보내기를 취소했습니다.');
@@ -170,6 +170,7 @@ $('export').onclick=async()=>{
   out=FriendStats.apply(SaveCore.parse(out),friendPending,friendGearPaths(oldOptions));
   if(friendLoveValues)out=FriendStats.applyLove(SaveCore.parse(out),friendLoveValues);
   if(pointValues)out=PlayerPoints.apply(SaveCore.parse(out),pointValues);
+  if(oldMeta)out=PlayerStats.applyMeta(SaveCore.parse(out),oldMeta);
   const preview=[...oldCounts].map(([p,v])=>describe('items',model.itemByPath.get(p),v)).concat([...oldOptions].map(([p,v])=>describe('gears',model.gearByPath.get(p),v))).join('\n\n');
   if(window.nativeRequest){
    if(!nativeSession)throw Error('위쪽 세이브 열기 버튼으로 실제 파일을 다시 여세요.');
@@ -214,12 +215,63 @@ if(window.chrome?.webview)installNative();
 function fmt(n){return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:3});}
 function renderStats(){
  statsReady=false;
- $('statsFields').replaceChildren();$('statsPreview').replaceChildren();$('stageStats').disabled=!doc||busy;if(!doc)return;
+ $('statsFields').replaceChildren();$('statsPreview').replaceChildren();$('stageStats').disabled=!doc||busy;
+ if(!doc){renderMeta();return;}
  try{
   const values=statDraft||statValues||PlayerStats.fields(doc);
   for(const [key,label,max] of PlayerStats.definitions){const box=document.createElement('label');box.textContent=label;const input=document.createElement('input');input.type='number';input.step='1';input.min='1';input.max=String(max);input.id='stat'+key;input.value=values[key];input.disabled=busy;input.oninput=previewStats;box.append(input);$('statsFields').append(box);}
   previewStats();
  }catch(e){$('statsPreview').textContent=e.message;$('statsPreview').className='error';$('stageStats').disabled=true;}
+ finally{renderMeta();}
+}
+function renderMeta(){
+ const box=$('statsMetaFields'),summary=$('statsMetaSummary');
+ if(!box||!summary)return;
+ box.replaceChildren();
+ if(!doc){summary.className='muted';summary.textContent='세이브를 열면 SixProCurrent · _Round · _DifficultyType · _Dlc · ChongHad · Fish · Gamble 현황을 표시합니다.';return;}
+ try{
+  const m=PlayerStats.inspectMeta(doc);
+  if(m.round.present&&m.round.valid){
+   const label=document.createElement('label');label.textContent='회차 (_Round · 0~999)';
+   const input=document.createElement('input');input.type='number';input.min='0';input.max='999';input.step='1';input.id='meta_Round';
+   input.value=String(metaDraft?._Round??metaValues?._Round??m.round.raw);input.disabled=busy;
+   label.append(input);box.append(label);
+  }
+  const parts=[
+   'SixProCurrent: '+(m.sixPro.present?(m.sixPro.valid?'['+m.sixPro.values.join('/')+']'+(m.sixPro.synced?' (일치)':' (기본치 차이)'):'형식 오류'):'미기록'),
+   '영충(ChongHad): '+(m.chongHad.present?(m.chongHad.valid?m.chongHad.count+'마리':'형식 오류'):'미기록'),
+   '충단지(ChongPotHad): '+(m.chongPotHad.present?(m.chongPotHad.valid?m.chongPotHad.count+'개':'형식 오류'):'미기록'),
+   '장착 영충(DressChong): '+(m.dressChong.present?(m.dressChong.valid?(m.dressChong.equipped?m.dressChong.name:'미장착'):'형식 오류'):'미기록'),
+   '낚시(Fish): '+(m.fish.present?(m.fish.valid?m.fish.count+'종':'형식 오류'):'미기록'),
+   '도박(Gamble): '+(m.gamble.present?(m.gamble.valid?m.gamble.count+'종':'형식 오류'):'미기록'),
+   '난이도(_DifficultyType): '+(m.difficulty.present?(m.difficulty.valid?m.difficulty.raw:'형식 오류'):'미기록'),
+   'DLC(_Dlc): '+(m.dlc.present?(m.dlc.valid?m.dlc.raw:'형식 오류'):'미기록'),
+   '회차(_Round): '+(m.round.present?(m.round.valid?m.round.raw:'형식 오류'):'미기록')
+  ];
+  summary.className='muted';summary.textContent=parts.join(' · ');
+ }catch(e){summary.className='status error';summary.textContent=e.message;}
+}
+function metaInputs(){
+ const fields=PlayerStats.metaFields(doc),out={};
+ for(const k of Object.keys(fields)){const el=$('meta'+k);if(!el)throw Error('세이브 진행 입력란이 준비되지 않았습니다.');out[k]=el.value;}
+ return out;
+}
+function queueMeta(){
+ if(busy||!doc)return false;
+ try{
+  metaDraft=metaInputs();
+  const r=PlayerStats.calculateMeta(doc,metaDraft);
+  metaValues=r.changes.size?{...metaDraft}:null;
+  invalidDrafts.delete('meta');revision++;pending();
+  msg('세이브 진행(_Round) 변경이 자동 반영됐습니다. 세이브 저장을 누르면 적용됩니다.');
+  return true;
+ }catch(e){invalidDrafts.set('meta',e.message);pending();msg(e.message,true);return false;}
+}
+function metaChanges(){
+ if(!metaValues)return;
+ const li=document.createElement('li'),button=document.createElement('button');
+ li.textContent='세이브 진행 · '+PlayerStats.metaDefinitions.filter(([k])=>metaValues[k]!==undefined).map(([k,label])=>label+' '+metaValues[k]).join(' / ');
+ button.textContent='취소';button.onclick=()=>discardDraft('meta');li.append(button);$('changes').append(li);
 }
 function statInputs(){PlayerStats.fields(doc);if(!$('statsFields')?.children?.length)throw Error('주인공 능력치 입력란이 준비되지 않았습니다.');return Object.fromEntries(PlayerStats.definitions.map(([key])=>{const el=$('stat'+key);if(!el)throw Error('주인공 능력치 입력란이 준비되지 않았습니다.');return [key,el.value];}));}
 function previewStats(){
@@ -308,12 +360,13 @@ function friendChanges(){
   if(summary.length){const li=document.createElement('li'),button=document.createElement('button');li.textContent='동료 호감도(FriendLoveNum) · '+summary.join(' / ');button.textContent='취소';button.onclick=()=>discardDraft('friendLove');li.append(button);$('changes').append(li);}
  }
 }
-function discardDraft(key){if(busy)return;if(key==='points'){pointValues=null;pointDraft=null;}else if(key==='stats'){statValues=null;statDraft=null;}else if(key==='friendLove'){friendLoveValues=null;friendLoveDraft=null;}else if(key.startsWith('friend:')){const path=key.slice(7);friendPending.delete(path);friendDrafts.delete(path);}else{const path=key.slice(6);counts.delete(path);options.delete(path);countDrafts.delete(path);optionDrafts.delete(path);}invalidDrafts.delete(key);revision++;pending();render();if(selected&&tab!=='stats'&&tab!=='friends')choose(selected);}
+function discardDraft(key){if(busy)return;if(key==='points'){pointValues=null;pointDraft=null;}else if(key==='stats'){statValues=null;statDraft=null;}else if(key==='meta'){metaValues=null;metaDraft=null;}else if(key==='friendLove'){friendLoveValues=null;friendLoveDraft=null;}else if(key.startsWith('friend:')){const path=key.slice(7);friendPending.delete(path);friendDrafts.delete(path);}else{const path=key.slice(6);counts.delete(path);options.delete(path);countDrafts.delete(path);optionDrafts.delete(path);}invalidDrafts.delete(key);revision++;pending();render();if(selected&&tab!=='stats'&&tab!=='friends')choose(selected);}
 function invalidChanges(){for(const [key,error] of invalidDrafts){const li=document.createElement('li'),button=document.createElement('button');li.className='error';li.textContent='저장 전 확인: '+error;button.textContent='이 입력 취소';button.onclick=()=>discardDraft(key);li.append(button);$('changes').append(li);}}
 document.addEventListener('input',e=>{
  if(busy||!doc)return;
  if(e.target.closest('#pointsFields'))queuePoints();
  else if(e.target.closest('#statsFields'))queueStats();
+ else if(e.target.closest('#statsMetaFields'))queueMeta();
  else if(e.target.closest('#friendFields'))queueFriend();
  else if(e.target.closest('#friendLoveFields'))queueFriendLove();
  else if(e.target.id==='quantity')$('stage').onclick();
@@ -382,7 +435,14 @@ const EDITOR_CODE_ATLAS=[
  ['SaveShopData','생활·상점·무공 테이블','상점·암시장 재고 데이터 (SaveShopData)','한정 재고 · 암시장 1·3·6단계','광림성 오두(한정 1개), 황우곡 단방회 상인, 오천성 암시장(특수 재료 1·3·6개 제출 해금) 품목별 잔여 수량 기록'],
  ['SaveGambleData','생활·상점·무공 테이블','도박장·패구·주사위 데이터 (SaveGambleData)','누적 승패 · 판돈 상한 기록','음수교 불주 고묘 패구, 금당도 만진각 주사위·기계 도박 등 미니게임 누적 승리 플래그 기록'],
  ['KFTable334','생활·상점·무공 테이블','전 무공 334종 테이블 (KFTable)','오행 5속성 · 3슬롯 코스트','금·목·수·화·토 5행 속성과 문파(school)·품급(rank 1~6)·초식 발동 코스트 3슬롯으로 구성된 334종 무공 마스터 테이블'],
- ['MissionPoint1086','생활·상점·무공 테이블','퀘스트 단계·거점 트리거 (MissionPoint)','236개 임무 · 1,086개 진행 지점','메인·문파·동료 호감도 임무 236종의 세부 진행 단계(1,086개 트리거 포인트) 달성 상태 기록']
+ ['MissionPoint1086','생활·상점·무공 테이블','퀘스트 단계·거점 트리거 (MissionPoint)','236개 임무 · 1,086개 진행 지점','메인·문파·동료 호감도 임무 236종의 세부 진행 단계(1,086개 트리거 포인트) 달성 상태 기록'],
+ ['AttackBaoJI','REA 전투 · 장비 역공학','치명타 확률 판정 (BattleUnit::AttackBaoJI)','0x18158f8f0 → 0x1815c07c0 (확률 >= 1.0 확정)','기본 치명타율(xmm6) + 0x18159f990 특수 버프·진형·스택×가중치(xmm7) 합산 후 >= 1.0(100%)이면 즉시 true, 미만이면 0x1815b7aa0 가중 랜덤 테이블([rax+0x18] == 1) 판정'],
+ ['AttackEnemyShanBi','REA 전투 · 장비 역공학','회피 확률 · 최소 하한 20.0 (BattleUnit::AttackEnemyShanBi)','0x181590160 · 하한 20.0 (@0x1828cec9c)','최종 회피율 = (대상 기본 회피율 + 스킬/버프 보정) - 공격자 명중 보정([rax+0x28c]). 0x1815904f0 비교에서 20.0 미만이면 최소 하한 20.0으로 바닥 보정 후 0x1815c0710 가중치 난수 판정'],
+ ['PlayerArmorGasCalculate','REA 전투 · 장비 역공학','기갑/내구 계산 (PlayerDataManager::PlayerArmorGasCalculate)','0x1813cec10 · 기본 가중치 1.0f (@0x1828c2cf8)','UnitPropertyDataSet과 장착 장비/무공 슬롯 리스트(+0x88)를 순회하며 type 1·2·3별 계수와 1.0f 기본 가중치를 합산해 플레이어 진기 갑옷/기갑 수치 산출'],
+ ['EquipSkillCalculate','REA 전투 · 장비 역공학','장비 스킬 계산 · 피격 로직 (EquipDataSet::SkillCalculate)','0x18164e3a0 · UIHitHurtLogic 0x18159dbd0','EquipDataSet::SkillCalculate(0x18164e3a0)로 장비 고유·등급별 스킬 수치를 반영하고, BattleUnit::UIHitHurtLogic(0x18159dbd0)에서 실명·반사·부동심 등 조건 분기 및 UI 연출 처리'],
+ ['FriendLoveExc','REA 전투 · 장비 역공학','호감도 실행 엔트리 (PlayerDataManager::FriendLoveExc)','0x1813bfa50 · FriendLoveNum 연동','대화·선물·사건 분기에서 동료 호감도(FriendLoveNum)를 증감·판정하는 IL2CPP 실행 엔트리'],
+ ['PlayerDataChong','REA 세이브 스키마 (PlayerData)','영충·투충·미니게임 필드 (ChongHad · Fish · Gamble)','ChongHad / ChongPotHad / DressChong / Fish / Gamble','PlayerData 미노출 주요 필드: 보유 영충(ChongHad)·충단지(ChongPotHad)·장착 영충(DressChong), 낚시 기록(Fish), 도박 기록(Gamble), 음식 제한(FoodItemLimit), 무공 숙련(KongFuTypeLv)'],
+ ['PlayerDataMeta','REA 세이브 스키마 (PlayerData)','회차·난이도·DLC·스냅샷 (SixProCurrent · _Round · _DifficultyType · _Dlc)','SixProCurrent{1..6} / _Round / _DifficultyType / _Dlc','6대 능력치 현재치 스냅샷(SixProCurrent)과 회차(_Round)·난이도(_DifficultyType)·DLC(_Dlc)·체력/도감(_TiLiNum/_TiLiCan/_LifeCheck/_TuJian) 실측 필드']
 ];
 
 function renderCodeAtlas(){

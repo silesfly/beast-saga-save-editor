@@ -278,9 +278,9 @@ internal sealed class EditorForm : Form {
               const subDoc=SaveCore.parse(new TextEncoder().encode(JSON.stringify({savePlayerData:{__type:'PlayerData, Assembly-CSharp',value:{ItemHad:{},FriendLoveNum:{'鹿柒':10}}},saveInfoData:{value:{}}})));
               if(!FriendStats.inspectLove(subDoc).some(x=>!x.present)||SaveCore.parse(FriendStats.applyLove(subDoc,{luxi:'60'})).byPath.has('/savePlayerData/value/FriendLoveNum/无常'))throw Error('미기록 호감도 보존 오류');
               $('codeAtlasSearch').value='의술 해금';$('codeAtlasSearch').oninput();
-              if(!($('editorCodeAtlasBody').querySelectorAll('tr').length-1>=1&&$('editorCodeAtlasBody').querySelectorAll('tr').length-1<38))throw Error('코드 사전 다중 검색 오류');
+              if(!($('editorCodeAtlasBody').querySelectorAll('tr').length-1>=1&&$('editorCodeAtlasBody').querySelectorAll('tr').length-1<EDITOR_CODE_ATLAS.length))throw Error('코드 사전 다중 검색 오류');
               $('codeAtlasReset').click();
-              if($('editorCodeAtlasBody').querySelectorAll('tr').length!==39)throw Error('코드 사전 초기화 오류');
+              if($('editorCodeAtlasBody').querySelectorAll('tr').length!==EDITOR_CODE_ATLAS.length+1)throw Error('코드 사전 초기화 오류');
               $('export').click();
             ");
             await Until("!busy && pendingSize()===0 && (/^(세이브|복사본) 저장 완료/).test($('status').textContent)");

@@ -77,6 +77,87 @@ const PlayerStats=(()=>{
   return {values:v,effective,base,max,hp,oldMax,oldHp,sources,changes};
  }
  function apply(doc,values){const plan=calculate(doc,values);return SaveCore.patch(doc,plan.changes,new Set(['_BaseHp','_MaxHp','_Hp'].map(k=>root+'/'+k)));}
- return {definitions,fields,validate,aggregate,calculate,apply,root,read};
+ const metaDefinitions=[['_Round','회차 (_Round)',0,999]];
+ function inspectMeta(doc){
+  SaveCore.requireGame(doc);
+  const p=doc.byPath.get(root);
+  if(p?.kind!=='object')throw Error('능력치 계산에 필요한 저장 구조가 없습니다.');
+  const intNode=k=>{
+   const n=doc.byPath.get(root+'/'+k);
+   if(!n)return {present:false,valid:true,raw:null,value:null,ptr:root+'/'+k};
+   if(n.kind!=='number'||!/^-?\d+$/.test(n.raw))return {present:true,valid:false,raw:n.raw,value:null,ptr:n.ptr};
+   const v=Number(n.raw);
+   if(!Number.isInteger(v)||v<-2147483648||v>2147483647)return {present:true,valid:false,raw:n.raw,value:null,ptr:n.ptr};
+   return {present:true,valid:true,raw:n.raw,value:v,ptr:n.ptr};
+  };
+  const countCollection=k=>{
+   const n=doc.byPath.get(root+'/'+k);
+   if(!n)return {present:false,valid:true,count:0};
+   if(n.kind!=='array'&&n.kind!=='object')return {present:true,valid:false,count:0};
+   return {present:true,valid:true,count:n.children.length};
+  };
+  const sixNode=doc.byPath.get(root+'/SixProCurrent');
+  let sixPro={present:false,valid:true,values:[],synced:null};
+  if(sixNode){
+   if(sixNode.kind!=='object')sixPro={present:true,valid:false,values:[],synced:false};
+   else{
+    const vals=[];let valid=true,synced=true;
+    for(let i=0;i<six.length;i++){
+     const c=doc.byPath.get(root+'/SixProCurrent/'+(i+1)),base=doc.byPath.get(root+'/'+six[i]);
+     if(c?.kind!=='number'||!/^-?\d+$/.test(c.raw)){valid=false;synced=false;vals.push(null);}
+     else{vals.push(Number(c.raw));if(base?.kind==='number'&&base.raw!==c.raw)synced=false;}
+    }
+    sixPro={present:true,valid,values:vals,synced:valid?synced:false};
+   }
+  }
+  const dressNode=doc.byPath.get(root+'/DressChong');
+  let dressChong={present:false,valid:true,equipped:false,name:null};
+  if(dressNode){
+   if(dressNode.kind==='null')dressChong={present:true,valid:true,equipped:false,name:null};
+   else if(dressNode.kind==='object'){const nm=dressNode.children.find(c=>c.path.at(-1)==='_Name');dressChong={present:true,valid:true,equipped:true,name:nm?.kind==='string'?nm.text:'장착됨'};}
+   else dressChong={present:true,valid:false,equipped:false,name:null};
+  }
+  const diffNode=doc.byPath.get(root+'/_DifficultyType');
+  let difficulty={present:false,valid:true,raw:null};
+  if(diffNode){
+   if(diffNode.kind==='number'||diffNode.kind==='string')difficulty={present:true,valid:true,raw:diffNode.kind==='string'?diffNode.text:diffNode.raw};
+   else difficulty={present:true,valid:false,raw:null};
+  }
+  return {
+   round:intNode('_Round'),
+   difficulty,
+   dlc:intNode('_Dlc'),
+   sixPro,
+   chongHad:countCollection('ChongHad'),
+   chongPotHad:countCollection('ChongPotHad'),
+   dressChong,
+   fish:countCollection('Fish'),
+   gamble:countCollection('Gamble')
+  };
+ }
+ function metaFields(doc){
+  const m=inspectMeta(doc),out={};
+  if(m.round.present){if(!m.round.valid)throw Error('회차 (_Round) 필드가 올바르지 않습니다.');out._Round=m.round.raw;}
+  return out;
+ }
+ function calculateMeta(doc,values){
+  const m=inspectMeta(doc);
+  if(Array.isArray(values)||!values||typeof values!=='object')throw Error('지원하지 않는 세이브 진행 항목입니다.');
+  const pairs=values instanceof Map?[...values.entries()]:Object.entries(values);
+  const out={},changes=new Map();
+  for(const [k,raw] of pairs){
+   const def=metaDefinitions.find(d=>d[0]===k);
+   if(!def)throw Error('지원하지 않는 세이브 진행 항목: '+k);
+   const [,label,min,max]=def,node=doc.byPath.get(root+'/'+k);
+   if(!node||node.kind!=='number'||!/^-?\d+$/.test(node.raw))throw Error(label+' 필드가 이 세이브에 없습니다.');
+   const s=String(raw);
+   if(!/^(0|[1-9]\d*)$/.test(s)||Number(s)<min||Number(s)>max)throw Error(label+'은 '+min+'~'+max.toLocaleString()+' 정수로 입력하세요.');
+   out[k]=String(Number(s));
+   if(node.raw!==out[k])changes.set(node.ptr,out[k]);
+  }
+  return {values:out,changes,meta:m};
+ }
+ function applyMeta(doc,values){return SaveCore.patch(doc,calculateMeta(doc,values).changes);}
+ return {definitions,metaDefinitions,fields,validate,aggregate,calculate,apply,inspectMeta,metaFields,calculateMeta,applyMeta,root,read};
 })();
 if(typeof module!=='undefined')module.exports=PlayerStats;
