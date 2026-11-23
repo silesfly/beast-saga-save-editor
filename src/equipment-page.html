@@ -1,8 +1,329 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html><html lang="ko" data-hyup-skin="m1" data-hyup-slug="beast-saga"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>영수강호 주인공·동료 세이브 편집기 0.11.2</title><style>
 :root{font-family:'Malgun Gothic',system-ui,sans-serif;background:#101820;color:#e8eff4;color-scheme:dark}*{box-sizing:border-box}body{margin:0}main{max-width:1380px;margin:auto;padding:32px}h1{font-size:30px;margin:8px 0}h2{font-size:19px;margin:0 0 18px}p{line-height:1.7}.eyebrow{font-size:12px;letter-spacing:2px;color:#8ee3c7}.muted,small{color:#a9bacb;font-size:14px}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,.filebutton{font:inherit;border:1px solid #456071;border-radius:7px;padding:10px 16px;background:#223a49;color:#e8eff4;cursor:pointer}button:disabled{opacity:.4;cursor:default}button:hover{background:#2c4d60}.primary,.active{background:#88e0c4!important;color:#102820!important;border-color:#88e0c4!important}.filebutton input{display:none}.card{background:#192630;border:1px solid #304554;border-radius:12px;padding:22px;margin-top:18px;min-width:0}.grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px}.toolbar input{flex:1;min-width:180px}input,select{font:inherit;padding:11px;background:#101b25;color:#e8eff4;border:1px solid #456071;border-radius:6px;max-width:100%}.status{padding:12px 0;color:#9ce0ca;line-height:1.6}.error{color:#ffada8}.notice{border-left:3px solid #dfb46b;background:#28271f;padding:12px 16px;margin:18px 0;font-size:14px;line-height:1.8}#list{max-height:610px;overflow:auto;display:grid;gap:8px;margin-top:12px}.entry{text-align:left;padding:14px;display:block;width:100%;background:#13212b}.entry strong{display:block;margin-bottom:7px}.entry span{font-size:12px;color:#afc0ce;display:block;line-height:1.6}.entry.changed{border-color:#8ee3c7}#fields label{display:block;margin:18px 0 8px;font-size:14px;line-height:1.6}#fields select,#fields input{display:block;width:100%;margin-bottom:10px}details{margin:14px 0;color:#9aafc0;font-size:12px}code{display:block;overflow-wrap:anywhere;line-height:1.7;margin:12px 0}#changes{max-height:300px;overflow:auto;padding-left:22px;font-size:14px;line-height:1.7}#changes li{margin:12px 0;overflow-wrap:anywhere}#changes button{padding:3px 8px;font-size:12px;margin-left:10px}.footer{border-top:1px solid #304554;padding-top:20px;margin-top:24px}@media(max-width:850px){main{padding:18px}.grid{grid-template-columns:1fr}h1{font-size:24px}}
-[hidden]{display:none!important}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.statgrid label{display:grid;gap:8px;font-size:14px}table{width:100%;border-collapse:collapse}td{padding:13px 7px;border-bottom:1px solid #456071}tr:first-child{color:#a9bacb;font-size:13px}.listtools,.pagination{margin-top:16px}.listtools label{display:flex;align-items:center;gap:8px;font-size:14px}.pagination{gap:8px}.pagination button{padding:9px 12px}.entry.selected{outline:2px solid #8ee3c7;outline-offset:-2px}</style></head><body><main><div class="eyebrow">BEAST SAGA · INVENTORY EDITOR 0.11.2</div><h1>주인공 · 동료 · 아이템 · 장비 편집</h1><p class="muted">값을 수정하면 변경 목록에 자동 반영됩니다. 세이브 저장으로 한 번에 적용하세요.</p>
+[hidden]{display:none!important}.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.statgrid label{display:grid;gap:8px;font-size:14px}table{width:100%;border-collapse:collapse}td{padding:13px 7px;border-bottom:1px solid #456071}tr:first-child{color:#a9bacb;font-size:13px}.listtools,.pagination{margin-top:16px}.listtools label{display:flex;align-items:center;gap:8px;font-size:14px}.pagination{gap:8px}.pagination button{padding:9px 12px}.entry.selected{outline:2px solid #8ee3c7;outline-offset:-2px}</style><style id="hyup-unified-skin">
+/* HyupEditors 25종 에디터 통합 스킨 — 수묵 장경각 (m1, stone-gold)
+ * 단독 HTML · 웹 에디터 · 통합 허브 단일 정본 스킨 (외부 참조 0건)
+ */
+
+/* 1. 기본 모드 전환 (시스템 기본 light dark + 명시적 테마/meta/body 동기화) */
+:root:root:root[data-hyup-skin="m1"] {
+  color-scheme: light dark;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-theme="light"],
+:root:root:root[data-hyup-skin="m1"][data-theme="밝음"],
+:root:root:root[data-hyup-skin="m1"]:not([data-theme="dark"]):not([data-theme="어두움"]):where(:has(> head > meta[name="color-scheme"][content="light"])),
+:root:root:root[data-hyup-skin="m1"][data-theme="light"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"][data-theme="밝음"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"] body[data-theme="light"],
+:root:root:root[data-hyup-skin="m1"] body[data-theme="밝음"] {
+  color-scheme: light;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-theme="dark"],
+:root:root:root[data-hyup-skin="m1"][data-theme="어두움"],
+:root:root:root[data-hyup-skin="m1"]:not([data-theme="light"]):not([data-theme="밝음"]):where(:has(> head > meta[name="color-scheme"][content="dark"])),
+:root:root:root[data-hyup-skin="m1"][data-theme="dark"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"][data-theme="어두움"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"] body[data-theme="dark"],
+:root:root:root[data-hyup-skin="m1"] body[data-theme="어두움"] {
+  color-scheme: dark;
+}
+
+/* 2. 다크 전용 에디터 3종 고정 (light 속성 지정 시에도 다크 유지) */
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"][data-theme="light"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="scroll-of-taiwu"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="scroll-of-taiwu"][data-theme="light"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="scroll-of-taiwu"] body[data-theme],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"][data-theme="light"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] body[data-theme] {
+  color-scheme: dark;
+}
+
+/* 3. 수묵 장경각 (m1) 라이트(한지) · 다크(묵갈) 통합 시맨틱 토큰 */
+:root:root:root[data-hyup-skin="m1"],
+:root:root:root[data-hyup-skin="m1"] body[data-theme] {
+  --hyup-font-sans: "Pretendard Variable", "Pretendard", "SUIT", "Segoe UI Variable", "Segoe UI", "Malgun Gothic", sans-serif;
+  --hyup-font-mono: "JetBrains Mono", "D2Coding", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --hyup-sb-thumb: light-dark(#8d7e68, #7a6b56);
+  --hyup-sb-track: light-dark(#efe9de, #1b1814);
+  --hyup-focus-ring: light-dark(#9a6510, #e6ae49);
+  --hyup-selection-bg: light-dark(rgba(154, 101, 16, 0.2), rgba(217, 160, 56, 0.28));
+
+  /* Canvas */
+  --bg: light-dark(#f7f4ee, #12110e);
+  --bg-base: light-dark(#f7f4ee, #12110e);
+  --paper: light-dark(#f7f4ee, #12110e);
+  --parchment-0: light-dark(#f7f4ee, #12110e);
+  --paper-deep: light-dark(#efe9de, #12110e);
+  --paper-sunk: light-dark(#e4dccb, #0e0d0a);
+
+  /* Surface */
+  --surface: light-dark(#fcfaf6, #1b1814);
+  --bg-surface: light-dark(#fcfaf6, #1b1814);
+  --paper-2: light-dark(#efe9de, #1b1814);
+  --paper2: light-dark(#efe9de, #1b1814);
+  --parchment-1: light-dark(#fcfaf6, #1b1814);
+  --panel: light-dark(#fcfaf6, #1b1814);
+  --bg-inset: light-dark(#efe9de, #161310);
+
+  /* Card / Elevated */
+  --card: light-dark(#fcfaf6, #221f19);
+  --surface-raised: light-dark(#fcfaf6, #221f19);
+  --bg-elevated: light-dark(#fcfaf6, #221f19);
+  --bg-header: light-dark(#fcfaf6, #1d1a15);
+  --paper-raised: light-dark(#fcfaf6, #221f19);
+  --paper-3: light-dark(#e4dccb, #221f19);
+  --parchment-2: light-dark(#efe9de, #221f19);
+  --panel-2: light-dark(#efe9de, #221f19);
+  --panel2: light-dark(#efe9de, #221f19);
+  --surface-2: light-dark(#efe9de, #221f19);
+  --surface-alt: light-dark(#efe9de, #221f19);
+  --bubble: light-dark(#fcfaf6, #221f19);
+  --card-2: light-dark(#efe9de, #221f19);
+
+  /* Soft / Table Head / Hover Surface */
+  --surface-soft: light-dark(#efe9de, #28241d);
+  --surface-3: light-dark(#e4dccb, #28241d);
+  --bg-muted: light-dark(#efe9de, #28241d);
+  --bg-table-head: light-dark(#ebe3d5, #26221b);
+  --surface-hover: light-dark(#e8e0d1, #2c271f);
+  --parchment-3: light-dark(#e4dccb, #28241d);
+  --panel-3: light-dark(#e4dccb, #28241d);
+  --wash: light-dark(#efe9de, #28241d);
+
+  /* Borders */
+  --border: light-dark(#dcd2c0, #383127);
+  --line: light-dark(#dcd2c0, #383127);
+  --rule: light-dark(#dcd2c0, #383127);
+  --line-soft: light-dark(#e6ddce, #2e2820);
+  --border-strong: light-dark(#bfae91, #564a39);
+  --line-strong: light-dark(#bfae91, #564a39);
+  --strong-border: light-dark(#bfae91, #564a39);
+  --line-2: light-dark(#bfae91, #564a39);
+
+  /* Typography */
+  --font-sans: var(--hyup-font-sans);
+  --font-ui: var(--hyup-font-sans);
+  --font-mono: var(--hyup-font-mono);
+  --text: light-dark(#1d1914, #f6f2eb);
+  --ink: light-dark(#1d1914, #f6f2eb);
+  --fg: light-dark(#1d1914, #f6f2eb);
+  --ink-0: light-dark(#1d1914, #f6f2eb);
+  --muted: light-dark(#5c5243, #b9ae9c);
+  --ink-soft: light-dark(#5c5243, #b9ae9c);
+  --ink-2: light-dark(#5c5243, #b9ae9c);
+  --ink2: light-dark(#5c5243, #b9ae9c);
+  --ink-1: light-dark(#41382c, #d4cab9);
+  --ink-muted: light-dark(#5c5243, #b9ae9c);
+  --text-muted: light-dark(#5c5243, #b9ae9c);
+  --text-dim: light-dark(#5c5243, #b9ae9c);
+  --ink-3: light-dark(#7a6e5c, #958976);
+  --ink-subtle: light-dark(#7a6e5c, #958976);
+
+  /* Accent (Stone-Gold) */
+  --accent: light-dark(#9a6510, #d9a038);
+  --gold: light-dark(#9a6510, #d9a038);
+  --accent-hover: light-dark(#7e5008, #e6ae49);
+  --accent-strong: light-dark(#7e5008, #e6ae49);
+  --accent-bright: light-dark(#b37814, #f0be63);
+  --accent-2: light-dark(#7e5008, #e6ae49);
+  --accent2: light-dark(#7e5008, #e6ae49);
+  --gold-2: light-dark(#b37814, #e6ae49);
+  --accent-fg: light-dark(#fcfaf6, #14110d);
+  --accent-ink: light-dark(#fcfaf6, #14110d);
+  --accent-soft: light-dark(rgba(154, 101, 16, 0.12), rgba(217, 160, 56, 0.16));
+  --accent-wash: light-dark(rgba(154, 101, 16, 0.12), rgba(217, 160, 56, 0.16));
+
+  /* Semantic */
+  --ok: light-dark(#0f6e46, #3ce396);
+  --jade: light-dark(#0f6e46, #3ce396);
+  --warn: light-dark(#a8670a, #e6ae49);
+  --danger: light-dark(#b91c1c, #f87171);
+  --focus: light-dark(#9a6510, #e6ae49);
+  --notice: light-dark(#f7ebd2, #2e2618);
+  --notice-fg: light-dark(#6b4706, #f2cf83);
+}
+
+/* 4. 개별 슬러그 토큰 매핑 및 하드코딩 색상 보정 */
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="jianghu-chronicles"] {
+  --canvas: light-dark(#f7f4ee, #12110e);
+  --paper: light-dark(#fcfaf6, #1e1a15);
+  --wash: light-dark(#efe9de, #26211b);
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="tale-of-immortal"] {
+  --ink-dark: #f6f2eb;
+  --ink-light: #1d1914;
+  --muted-dark: #b9ae9c;
+  --muted-light: #5c5243;
+  --surface-dark: #1b1814;
+  --surface-light: #fcfaf6;
+  --surface-2-dark: #221f19;
+  --surface-2-light: #efe9de;
+  --border-dark: #383127;
+  --border-light: #dcd2c0;
+  --jade-dark: #3ce396;
+  --jade-light: #0f6e46;
+  --jade-soft-dark: rgba(60, 227, 150, 0.14);
+  --jade-soft-light: #d9efe7;
+  --amber-dark: #d9a038;
+  --amber-light: #9a6510;
+  --amber-soft-dark: rgba(217, 160, 56, 0.16);
+  --amber-soft-light: #f5e6c8;
+  --amber-ink-dark: #14110d;
+  --amber-ink-light: #fcfaf6;
+  --jade-soft: light-dark(#d9efe7, rgba(60, 227, 150, 0.14));
+  --amber: light-dark(#9a6510, #d9a038);
+  --amber-soft: light-dark(#f5e6c8, rgba(217, 160, 56, 0.16));
+  --amber-ink: light-dark(#fcfaf6, #14110d);
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"],
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] body {
+  background: #12110e;
+  color: #f6f2eb;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(section, details, .card, .panel) {
+  background-color: #1b1814;
+  border-color: #383127;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(input, select, textarea) {
+  background-color: #221f19;
+  color: #f6f2eb;
+  border-color: #383127;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(button, .filebutton) {
+  background-color: #28241d;
+  color: #f6f2eb;
+  border-color: #564a39;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(button, .filebutton):hover {
+  background-color: #342e25;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(.primary, .active) {
+  background: #d9a038 !important;
+  color: #14110d !important;
+  border-color: #d9a038 !important;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] th {
+  background-color: #26221b;
+  color: #f6f2eb;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="beast-saga"] :is(table, th, td) {
+  border-color: #383127;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="ho-tu-lo-shu-14books"] button.primary,
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="ho-tu-lo-shu-14books"] button.primary:hover:not(:disabled) {
+  color: light-dark(#fcfaf6, #14110d);
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"] .app-header {
+  background: linear-gradient(180deg, #221f19, #1b1814);
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"] :is(input, select, textarea) {
+  background: #161310;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="heros-adventure"] .btn:hover {
+  background: #2c271f;
+  border-color: #564a39;
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="scroll-of-taiwu"] .topbar {
+  background: rgba(24, 21, 17, 0.94);
+}
+
+:root:root:root[data-hyup-skin="m1"][data-hyup-slug="scroll-of-taiwu"] button.primary {
+  color: #14110d;
+}
+
+/* 5. 비파괴적 공용 UI 폴리싱 (레이아웃/높이/overflow 간섭 금지) */
+html[data-hyup-skin="m1"] {
+  accent-color: var(--accent);
+  scrollbar-color: var(--hyup-sb-thumb) var(--hyup-sb-track);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+html[data-hyup-skin="m1"] body {
+  font-family: var(--hyup-font-sans);
+}
+
+html[data-hyup-skin="m1"] :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+html[data-hyup-skin="m1"] :is(code, kbd, pre, samp) {
+  font-family: var(--hyup-font-mono);
+}
+
+html[data-hyup-skin="m1"] ::selection {
+  background: var(--hyup-selection-bg);
+}
+
+html[data-hyup-skin="m1"] :focus-visible {
+  outline: 2px solid var(--hyup-focus-ring);
+  outline-offset: 2px;
+}
+
+@supports not (scrollbar-color: auto) {
+  html[data-hyup-skin="m1"],
+  html[data-hyup-skin="m1"] * {
+    scrollbar-width: auto;
+  }
+
+  html[data-hyup-skin="m1"]::-webkit-scrollbar,
+  html[data-hyup-skin="m1"] *::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  html[data-hyup-skin="m1"]::-webkit-scrollbar-track,
+  html[data-hyup-skin="m1"] *::-webkit-scrollbar-track {
+    background: var(--hyup-sb-track);
+  }
+
+  html[data-hyup-skin="m1"]::-webkit-scrollbar-thumb,
+  html[data-hyup-skin="m1"] *::-webkit-scrollbar-thumb {
+    background: var(--hyup-sb-thumb);
+    border-radius: 6px;
+    border: 2px solid var(--hyup-sb-track);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-hyup-skin="m1"] *,
+  html[data-hyup-skin="m1"] *::before,
+  html[data-hyup-skin="m1"] *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html[data-hyup-skin="m1"] :focus-visible {
+    outline-color: Highlight;
+  }
+}
+</style>
+</head><body><main><div class="eyebrow">BEAST SAGA · INVENTORY EDITOR 0.11.2</div><h1>주인공 · 동료 · 아이템 · 장비 편집</h1><p class="muted">값을 수정하면 변경 목록에 자동 반영됩니다. 세이브 저장으로 한 번에 적용하세요.</p>
 <div class="toolbar"><label class="filebutton primary">세이브 .es3 열기<input type="file" id="file" accept=".es3"></label><button id="moneyButton" disabled>돈 · 동전 수정</button><button id="backup">원본 백업 다운로드</button><span id="totals" class="muted">게임을 종료하고 편집할 세이브를 선택하세요.</span></div>
 <div id="modeNotice" class="notice">주인공 능력치를 바꾸면 장비·내공·특성 보정을 반영해 기혈을 자동 계산합니다. 브라우저판은 원본을 덮어쓰지 않고 수정본을 다운로드합니다. 먼저 원본 백업을 다운로드하세요. 설치 데이터 확인·아이템 추가·장비 옵션 저장은 Windows 실행판을 사용하세요.</div>
 <div id="status" class="status" role="status">인터넷 전송 없이 로컬에서 처리합니다.</div>
